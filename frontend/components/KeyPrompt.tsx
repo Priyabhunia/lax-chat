@@ -1,6 +1,6 @@
 import { Button } from '@/frontend/components/ui/button';
 import { Key } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom';
 
 export default function KeyPrompt() {
   return (

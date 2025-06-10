@@ -1,8 +1,8 @@
-import { useLiveQuery } from 'dexie-react-hooks';
-import { getMessageSummaries } from '@/frontend/dexie/queries';
 import { memo } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './ui/button';
+import { useMessageSummaries } from '../hooks/useConvexData';
+import { useAuth } from '../providers/ConvexAuthProvider';
 
 interface MessageNavigatorProps {
   threadId: string;
@@ -17,10 +17,8 @@ function PureChatNavigator({
   isVisible,
   onClose,
 }: MessageNavigatorProps) {
-  const messageSummaries = useLiveQuery(
-    () => getMessageSummaries(threadId),
-    [threadId]
-  );
+  const { user } = useAuth();
+  const messageSummaries = useMessageSummaries(threadId);
 
   return (
     <>
@@ -54,7 +52,7 @@ function PureChatNavigator({
             <ul className="flex flex-col gap-2 p-4 prose prose-sm dark:prose-invert list-disc pl-5 h-full overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 scrollbar-thumb-rounded-full">
               {messageSummaries?.map((summary) => (
                 <li
-                  key={summary.id}
+                  key={summary._id}
                   onClick={() => {
                     scrollToMessage(summary.messageId);
                   }}

@@ -5,6 +5,7 @@ export const AI_MODELS = [
   'Deepseek V3',
   'Gemini 2.5 Pro',
   'Gemini 2.5 Flash',
+  'Gemini 2.0 Flash',
   'GPT-4o',
   'GPT-4.1-mini',
 ] as const;
@@ -29,12 +30,17 @@ export const MODEL_CONFIGS = {
     headerKey: 'X-OpenRouter-API-Key',
   },
   'Gemini 2.5 Pro': {
-    modelId: 'gemini-2.5-pro-preview-05-06',
+    modelId: 'gemini-2.5-pro-preview-06-05',
     provider: 'google',
     headerKey: 'X-Google-API-Key',
   },
   'Gemini 2.5 Flash': {
-    modelId: 'gemini-2.5-flash-preview-04-17',
+    modelId: 'gemini-2.5-flash-preview-05-20',
+    provider: 'google',
+    headerKey: 'X-Google-API-Key',
+  },
+  'Gemini 2.0 Flash': {
+    modelId: 'gemini-2.0-flash',
     provider: 'google',
     headerKey: 'X-Google-API-Key',
   },

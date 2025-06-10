@@ -11,9 +11,9 @@ import {
 } from '@/frontend/components/ui/dropdown-menu';
 import useAutoResizeTextarea from '@/hooks/useAutoResizeTextArea';
 import { UseChatHelpers, useCompletion } from '@ai-sdk/react';
-import { useParams } from 'react-router';
-import { useNavigate } from 'react-router';
-import { createMessage, createThread } from '@/frontend/dexie/queries';
+import { useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useCreateMessage, useCreateThread } from '@/frontend/hooks/useConvexData';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 import { useModelStore } from '@/frontend/stores/ModelStore';
 import { AI_MODELS, AIModel, getModelConfig } from '@/lib/models';
@@ -31,6 +31,7 @@ interface ChatInputProps {
   setInput: UseChatHelpers['setInput'];
   append: UseChatHelpers['append'];
   stop: UseChatHelpers['stop'];
+  userId: string;
 }
 
 interface StopButtonProps {
@@ -57,8 +58,11 @@ function PureChatInput({
   setInput,
   append,
   stop,
+  userId,
 }: ChatInputProps) {
   const canChat = useAPIKeyStore((state) => state.hasRequiredKeys());
+  const createMessage = useCreateMessage();
+  const createThread = useCreateThread();
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 72,
@@ -88,8 +92,9 @@ function PureChatInput({
     const messageId = uuidv4();
 
     if (!id) {
+      // Create a new thread if we're not in one
+      await createThread("New Chat", userId);
       navigate(`/chat/${threadId}`);
-      await createThread(threadId);
       complete(currentInput.trim(), {
         body: { threadId, messageId, isTitle: true },
       });
@@ -98,7 +103,7 @@ function PureChatInput({
     }
 
     const userMessage = createUserMessage(messageId, currentInput.trim());
-    await createMessage(threadId, userMessage);
+    await createMessage(threadId, userMessage, userId);
 
     append(userMessage);
     setInput('');
@@ -113,6 +118,9 @@ function PureChatInput({
     textareaRef,
     threadId,
     complete,
+    userId,
+    createMessage,
+    createThread,
   ]);
 
   if (!canChat) {
@@ -181,6 +189,7 @@ function PureChatInput({
 const ChatInput = memo(PureChatInput, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   if (prevProps.status !== nextProps.status) return false;
+  if (prevProps.userId !== nextProps.userId) return false;
   return true;
 });
 

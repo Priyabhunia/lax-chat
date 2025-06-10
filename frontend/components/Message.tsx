@@ -35,7 +35,7 @@ function PureMessage({
         message.role === 'user' ? 'items-end' : 'items-start'
       )}
     >
-      {message.parts.map((part, index) => {
+      {message.parts.map((part: any, index: any) => {
         const { type } = part;
         const key = `message-${message.id}-part-${index}`;
 

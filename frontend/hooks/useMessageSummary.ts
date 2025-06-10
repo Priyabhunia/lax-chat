@@ -1,7 +1,8 @@
 import { useCompletion } from '@ai-sdk/react';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 import { toast } from 'sonner';
-import { createMessageSummary, updateThread } from '@/frontend/dexie/queries';
+import { useCreateMessageSummary, useUpdateThread } from './useConvexData';
+import { useAuth } from '../providers/ConvexAuthProvider';
 
 interface MessageSummaryPayload {
   title: string;
@@ -12,6 +13,9 @@ interface MessageSummaryPayload {
 
 export const useMessageSummary = () => {
   const getKey = useAPIKeyStore((state) => state.getKey);
+  const createMessageSummary = useCreateMessageSummary();
+  const updateThread = useUpdateThread();
+  const { user } = useAuth();
 
   const { complete, isLoading } = useCompletion({
     api: '/api/completion',
@@ -19,6 +23,8 @@ export const useMessageSummary = () => {
       headers: { 'X-Google-API-Key': getKey('google')! },
     }),
     onResponse: async (response) => {
+      if (!user) return;
+      
       try {
         const payload: MessageSummaryPayload = await response.json();
 
@@ -27,9 +33,9 @@ export const useMessageSummary = () => {
 
           if (isTitle) {
             await updateThread(threadId, title);
-            await createMessageSummary(threadId, messageId, title);
+            await createMessageSummary(threadId, messageId, title, user.userId);
           } else {
-            await createMessageSummary(threadId, messageId, title);
+            await createMessageSummary(threadId, messageId, title, user.userId);
           }
         } else {
           toast.error('Failed to generate a summary for the message');

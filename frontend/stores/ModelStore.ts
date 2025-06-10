@@ -1,51 +1,75 @@
-import { create, Mutate, StoreApi } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { AIModel, getModelConfig, ModelConfig } from '@/lib/models';
+import { create } from 'zustand';
+import { AIModel, getModelConfig, ModelConfig, AI_MODELS } from '@/lib/models';
 
-type ModelStore = {
+// Define the interface for our store
+interface ModelStore {
   selectedModel: AIModel;
   setModel: (model: AIModel) => void;
   getModelConfig: () => ModelConfig;
+}
+
+// Load the saved model from localStorage if available
+const getSavedModel = (): AIModel => {
+  if (typeof window === 'undefined') {
+    return 'Gemini 2.0 Flash'; // Default for SSR
+  }
+  
+  try {
+    const saved = localStorage.getItem('selected-model');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.selectedModel && typeof parsed.selectedModel === 'string') {
+        // Validate that it's a valid model
+        if (AI_MODELS.includes(parsed.selectedModel)) {
+          return parsed.selectedModel as AIModel;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error loading saved model:', error);
+  }
+  
+  // Default model if nothing valid was found
+  return 'Gemini 2.0 Flash';
 };
 
-type StoreWithPersist = Mutate<
-  StoreApi<ModelStore>,
-  [['zustand/persist', { selectedModel: AIModel }]]
->;
+// Create the store with a simple implementation
+export const useModelStore = create<ModelStore>()((set, get) => ({
+  // Initialize with saved value or default
+  selectedModel: getSavedModel(),
 
-export const withStorageDOMEvents = (store: StoreWithPersist) => {
-  const storageEventCallback = (e: StorageEvent) => {
-    if (e.key === store.persist.getOptions().name && e.newValue) {
-      store.persist.rehydrate();
+  // Method to change the selected model
+  setModel: (model: AIModel) => {
+    set({ selectedModel: model });
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem('selected-model', JSON.stringify({ selectedModel: model }));
+    } catch (error) {
+      console.error('Failed to save model to localStorage:', error);
     }
-  };
+  },
 
-  window.addEventListener('storage', storageEventCallback);
+  // Method to get the configuration for the currently selected model
+  getModelConfig: () => {
+    const { selectedModel } = get();
+    return getModelConfig(selectedModel);
+  },
+}));
 
-  return () => {
-    window.removeEventListener('storage', storageEventCallback);
-  };
-};
-
-export const useModelStore = create<ModelStore>()(
-  persist(
-    (set, get) => ({
-      selectedModel: 'Gemini 2.5 Flash',
-
-      setModel: (model) => {
-        set({ selectedModel: model });
-      },
-
-      getModelConfig: () => {
-        const { selectedModel } = get();
-        return getModelConfig(selectedModel);
-      },
-    }),
-    {
-      name: 'selected-model',
-      partialize: (state) => ({ selectedModel: state.selectedModel }),
+// Handle storage events for cross-tab sync
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'selected-model' && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed.selectedModel) {
+          // Update the store without triggering another localStorage save
+          useModelStore.setState({ selectedModel: parsed.selectedModel });
+        }
+      } catch (error) {
+        console.error('Error syncing model across tabs:', error);
+      }
     }
-  )
-);
-
-withStorageDOMEvents(useModelStore);
+  });
+}

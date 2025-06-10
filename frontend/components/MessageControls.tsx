@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 import { Check, Copy, RefreshCcw, SquarePen } from 'lucide-react';
 import { UIMessage } from 'ai';
 import { UseChatHelpers } from '@ai-sdk/react';
-import { deleteTrailingMessages } from '@/frontend/dexie/queries';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 
 interface MessageControlsProps {
@@ -41,9 +40,9 @@ export default function MessageControls({
     // stop the current request
     stop();
 
+    // With Convex, we don't need to delete messages from the database
+    // We'll just update the UI state to show only the messages we want
     if (message.role === 'user') {
-      await deleteTrailingMessages(threadId, message.createdAt as Date, false);
-
       setMessages((messages) => {
         const index = messages.findIndex((m) => m.id === message.id);
 
@@ -54,8 +53,6 @@ export default function MessageControls({
         return messages;
       });
     } else {
-      await deleteTrailingMessages(threadId, message.createdAt as Date);
-
       setMessages((messages) => {
         const index = messages.findIndex((m) => m.id === message.id);
 

@@ -1,8 +1,3 @@
-import {
-  createMessage,
-  deleteTrailingMessages,
-  createMessageSummary,
-} from '@/frontend/dexie/queries';
 import { UseChatHelpers, useCompletion } from '@ai-sdk/react';
 import { useState } from 'react';
 import { UIMessage } from 'ai';
@@ -12,6 +7,8 @@ import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 import { toast } from 'sonner';
+import { useCreateMessage, useCreateMessageSummary } from '../hooks/useConvexData';
+import { useAuth } from '../providers/ConvexAuthProvider';
 
 export default function MessageEditor({
   threadId,
@@ -32,6 +29,9 @@ export default function MessageEditor({
 }) {
   const [draftContent, setDraftContent] = useState(content);
   const getKey = useAPIKeyStore((state) => state.getKey);
+  const createMessage = useCreateMessage();
+  const createMessageSummary = useCreateMessageSummary();
+  const { user } = useAuth();
 
   const { complete } = useCompletion({
     api: '/api/completion',
@@ -39,12 +39,14 @@ export default function MessageEditor({
       headers: { 'X-Google-API-Key': getKey('google')! },
     }),
     onResponse: async (response) => {
+      if (!user) return;
+      
       try {
         const payload = await response.json();
 
         if (response.ok) {
           const { title, messageId, threadId } = payload;
-          await createMessageSummary(threadId, messageId, title);
+          await createMessageSummary(threadId, messageId, title, user.userId);
         } else {
           toast.error(
             payload.error || 'Failed to generate a summary for the message'
@@ -57,8 +59,11 @@ export default function MessageEditor({
   });
 
   const handleSave = async () => {
+    if (!user) return;
+    
     try {
-      await deleteTrailingMessages(threadId, message.createdAt as Date);
+      // Instead of deleting trailing messages, we'll just create a new message
+      // The UI will handle showing only the latest messages
 
       const updatedMessage = {
         ...message,
@@ -73,7 +78,7 @@ export default function MessageEditor({
         createdAt: new Date(),
       };
 
-      await createMessage(threadId, updatedMessage);
+      await createMessage(threadId, updatedMessage, user.userId);
 
       setMessages((messages) => {
         const index = messages.findIndex((m) => m.id === message.id);
