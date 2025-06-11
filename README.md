@@ -1,4 +1,4 @@
-# Chat0
+# me
 
 Blazingly-Fast, Open-source, and Free AI Chat App with Convex backend.
 
@@ -24,12 +24,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 💻 Running Locally
 
-To run Chat0 locally, you'll need to follow these steps:
+To run me3 locally, you'll need to follow these steps:
 
 ### 1. Clone the repository:
 ```bash
-git clone https://github.com/senbo1/chat0.git
-cd chat0
+git clone https://github.com/priyabhunia/me.git
+cd me
 ```
 
 ### 2. Install dependencies:
@@ -73,7 +73,7 @@ Navigate to [http://localhost:3000](http://localhost:3000) to see the applicatio
 
 ## 🔐 Authentication Setup
 
-Chat0 uses Convex for user authentication:
+me uses Convex for user authentication:
 
 1. Register a new account on the app's login page
 2. Your credentials are securely stored in the Convex database
@@ -107,10 +107,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch
 5. Open a Pull Request
 
-## 🐛 Issues & Support
+Thankyou snebo
 
-If you encounter any issues or have questions, please [open an issue](https://github.com/senbo1/chat0/issues) on GitHub.
 
-## 💰 Buy me a coffee
 
-- [coff.ee/senbo](https://coff.ee/senbo)
