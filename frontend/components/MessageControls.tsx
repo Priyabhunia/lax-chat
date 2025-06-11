@@ -5,6 +5,12 @@ import { Check, Copy, RefreshCcw, SquarePen } from 'lucide-react';
 import { UIMessage } from 'ai';
 import { UseChatHelpers } from '@ai-sdk/react';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
+import { toast } from 'sonner';
+import { useModelStore } from '@/frontend/stores/ModelStore';
+import { v4 as uuidv4 } from 'uuid';
+import { useCreateMessage } from '../hooks/useConvexData';
+import { useAuth } from '../providers/ConvexAuthProvider';
+import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHelpers';
 
 interface MessageControlsProps {
   threadId: string;
@@ -26,7 +32,12 @@ export default function MessageControls({
   stop,
 }: MessageControlsProps) {
   const [copied, setCopied] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const hasRequiredKeys = useAPIKeyStore((state) => state.hasRequiredKeys());
+  const getKey = useAPIKeyStore((state) => state.getKey);
+  const modelConfig = useModelStore((state) => state.getModelConfig());
+  const createMessage = useCreateMessage();
+  const { user } = useAuth();
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -37,36 +48,186 @@ export default function MessageControls({
   };
 
   const handleRegenerate = async () => {
-    // stop the current request
-    stop();
-
-    // With Convex, we don't need to delete messages from the database
-    // We'll just update the UI state to show only the messages we want
-    if (message.role === 'user') {
-      setMessages((messages) => {
-        const index = messages.findIndex((m) => m.id === message.id);
-
-        if (index !== -1) {
-          return [...messages.slice(0, index + 1)];
+    if (isRegenerating) return;
+    
+    try {
+      setIsRegenerating(true);
+      console.log('Regenerating message:', message.id);
+      
+      // Stop any ongoing requests
+      stop();
+      
+      // Update UI to remove messages after this one
+      if (message.role === 'user') {
+        console.log('Keeping user message and removing subsequent messages');
+        setMessages((messages) => {
+          const index = messages.findIndex((m) => m.id === message.id);
+          
+          if (index !== -1) {
+            const updatedMessages = [...messages.slice(0, index + 1)];
+            console.log('Updated messages:', updatedMessages);
+            return updatedMessages;
+          }
+          
+          return messages;
+        });
+        
+        // Wait a short time for UI to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Get the current messages after the UI update
+        let currentMessages: UIMessage[] = [];
+        setMessages(messages => {
+          currentMessages = [...messages] as UIMessage[];
+          return messages;
+        });
+        
+        // Get API key for the selected model
+        const apiKey = getKey(modelConfig.provider);
+        if (!apiKey) {
+          toast.error('API key is missing');
+          return;
         }
-
-        return messages;
-      });
-    } else {
-      setMessages((messages) => {
-        const index = messages.findIndex((m) => m.id === message.id);
-
-        if (index !== -1) {
-          return [...messages.slice(0, index)];
+        
+        try {
+          // Call appropriate API based on provider
+          let responseText = '';
+          
+          switch (modelConfig.provider) {
+            case 'google':
+              responseText = await callGeminiAPI(currentMessages, apiKey, modelConfig.modelId);
+              break;
+            case 'openai':
+              responseText = await callOpenAIAPI(currentMessages, apiKey, modelConfig.modelId);
+              break;
+            case 'openrouter':
+              responseText = await callOpenRouterAPI(currentMessages, apiKey, modelConfig.modelId);
+              break;
+            default:
+              throw new Error(`Unsupported provider: ${modelConfig.provider}`);
+          }
+          
+          // Create AI message
+          const aiMsg: UIMessage = {
+            id: uuidv4(),
+            role: 'assistant',
+            content: responseText,
+            createdAt: new Date(),
+            parts: [{ type: 'text', text: responseText }]
+          };
+          
+          // Add AI message to UI
+          setMessages([...currentMessages, aiMsg]);
+          
+          // Save AI message to database
+          await createMessage(threadId, aiMsg, user?.userId || '');
+          
+        } catch (error) {
+          console.error("API Error:", error);
+          toast.error(`Error: ${error instanceof Error ? error.message : 'Failed to get response'}`);
         }
-
-        return messages;
-      });
+      } else {
+        console.log('Removing assistant message and finding previous user message');
+        
+        // Find the last user message before this assistant message
+        let lastUserMessage: UIMessage | null = null;
+        
+        setMessages((messages) => {
+          const index = messages.findIndex((m) => m.id === message.id);
+          
+          if (index !== -1) {
+            // Find the last user message before this assistant message
+            let lastUserMessageIndex = -1;
+            for (let i = index - 1; i >= 0; i--) {
+              if (messages[i].role === 'user') {
+                lastUserMessageIndex = i;
+                lastUserMessage = messages[i] as UIMessage;
+                break;
+              }
+            }
+            
+            // If we found a user message, keep everything up to and including it
+            if (lastUserMessageIndex !== -1) {
+              const updatedMessages = [...messages.slice(0, lastUserMessageIndex + 1)];
+              console.log('Updated messages:', updatedMessages);
+              return updatedMessages;
+            }
+            
+            // Otherwise just remove this message
+            const updatedMessages = [...messages.slice(0, index)];
+            console.log('Updated messages (no user message found):', updatedMessages);
+            return updatedMessages;
+          }
+          
+          return messages;
+        });
+        
+        // For assistant messages, we need to wait a bit longer to ensure UI updates
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Get the current messages after the UI update
+        let currentMessages: UIMessage[] = [];
+        setMessages(messages => {
+          currentMessages = [...messages] as UIMessage[];
+          return messages;
+        });
+        
+        // If we have a user message to regenerate from
+        if (lastUserMessage && user) {
+          // Get API key for the selected model
+          const apiKey = getKey(modelConfig.provider);
+          if (!apiKey) {
+            toast.error('API key is missing');
+            return;
+          }
+          
+          try {
+            // Call appropriate API based on provider
+            let responseText = '';
+            
+            switch (modelConfig.provider) {
+              case 'google':
+                responseText = await callGeminiAPI(currentMessages, apiKey, modelConfig.modelId);
+                break;
+              case 'openai':
+                responseText = await callOpenAIAPI(currentMessages, apiKey, modelConfig.modelId);
+                break;
+              case 'openrouter':
+                responseText = await callOpenRouterAPI(currentMessages, apiKey, modelConfig.modelId);
+                break;
+              default:
+                throw new Error(`Unsupported provider: ${modelConfig.provider}`);
+            }
+            
+            // Create AI message
+            const aiMsg: UIMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: responseText,
+              createdAt: new Date(),
+              parts: [{ type: 'text', text: responseText }]
+            };
+            
+            // Add AI message to UI
+            setMessages([...currentMessages, aiMsg]);
+            
+            // Save AI message to database
+            await createMessage(threadId, aiMsg, user.userId);
+            
+          } catch (error) {
+            console.error("API Error:", error);
+            toast.error(`Error: ${error instanceof Error ? error.message : 'Failed to get response'}`);
+          }
+        }
+      }
+      
+      console.log('Regeneration completed');
+    } catch (error) {
+      console.error('Error during regeneration:', error);
+      toast.error('Failed to regenerate response');
+    } finally {
+      setIsRegenerating(false);
     }
-
-    setTimeout(() => {
-      reload();
-    }, 0);
   };
 
   return (
@@ -87,8 +248,13 @@ export default function MessageControls({
         </Button>
       )}
       {hasRequiredKeys && (
-        <Button variant="ghost" size="icon" onClick={handleRegenerate}>
-          <RefreshCcw className="w-4 h-4" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleRegenerate}
+          disabled={isRegenerating}
+        >
+          <RefreshCcw className={cn("w-4 h-4", { "animate-spin": isRegenerating })} />
         </Button>
       )}
     </div>

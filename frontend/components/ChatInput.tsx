@@ -1,5 +1,5 @@
 import { ChevronDown, Check, ArrowUpIcon } from 'lucide-react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Textarea } from '@/frontend/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Button } from '@/frontend/components/ui/button';
@@ -23,6 +23,22 @@ import { v4 as uuidv4 } from 'uuid';
 import { StopIcon } from './ui/icons';
 import { toast } from 'sonner';
 import { useMessageSummary } from '../hooks/useMessageSummary';
+
+// Declare global types for our submission tracking
+declare global {
+  interface Window {
+    _isSubmitting: boolean;
+    _lastSubmissionTime: number;
+    _submissionCount: number;
+  }
+}
+
+// Create a global submission lock to prevent duplicate submissions
+if (typeof window !== 'undefined') {
+  window._isSubmitting = window._isSubmitting || false;
+  window._lastSubmissionTime = window._lastSubmissionTime || 0;
+  window._submissionCount = window._submissionCount || 0;
+}
 
 interface ChatInputProps {
   threadId: string;
@@ -63,6 +79,7 @@ function PureChatInput({
   const canChat = useAPIKeyStore((state) => state.hasRequiredKeys());
   const createMessage = useCreateMessage();
   const createThread = useCreateThread();
+  const isSubmittingRef = useRef(false);
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 72,
@@ -73,7 +90,7 @@ function PureChatInput({
   const { id } = useParams();
 
   const isDisabled = useMemo(
-    () => !input.trim() || status === 'streaming' || status === 'submitted',
+    () => !input.trim() || status !== 'ready' || isSubmittingRef.current,
     [input, status]
   );
 
@@ -81,33 +98,44 @@ function PureChatInput({
 
   const handleSubmit = useCallback(async () => {
     const currentInput = textareaRef.current?.value || input;
+    if (!currentInput.trim() || status !== 'ready' || window._isSubmitting) return;
 
-    if (
-      !currentInput.trim() ||
-      status === 'streaming' ||
-      status === 'submitted'
-    )
-      return;
+    window._isSubmitting = true;
+    isSubmittingRef.current = true;
+    
+    try {
+      // Create a message ID
+      const messageId = uuidv4();
+      const userMessage = createUserMessage(messageId, currentInput.trim());
+      
+      // Clear input and reset height immediately
+      setInput('');
+      adjustHeight(true);
+      
+      // Handle thread creation if necessary
+      if (!id) {
+        // Create a new thread if we're not in one
+        const newThreadId = await createThread("New Chat", userId);
+        navigate(`/chat/${newThreadId || threadId}`);
+        complete(currentInput.trim(), {
+          body: { threadId: newThreadId || threadId, messageId, isTitle: true },
+        });
+      } else {
+        complete(currentInput.trim(), { body: { messageId, threadId } });
+      }
 
-    const messageId = uuidv4();
-
-    if (!id) {
-      // Create a new thread if we're not in one
-      await createThread("New Chat", userId);
-      navigate(`/chat/${threadId}`);
-      complete(currentInput.trim(), {
-        body: { threadId, messageId, isTitle: true },
-      });
-    } else {
-      complete(currentInput.trim(), { body: { messageId, threadId } });
+      // Save message to database
+      await createMessage(threadId, userMessage, userId);
+      
+      // Append message to UI
+      await append(userMessage);
+    } catch (error) {
+      console.error('Error submitting message:', error);
+      toast.error('Failed to send message');
+    } finally {
+      window._isSubmitting = false;
+      isSubmittingRef.current = false;
     }
-
-    const userMessage = createUserMessage(messageId, currentInput.trim());
-    await createMessage(threadId, userMessage, userId);
-
-    append(userMessage);
-    setInput('');
-    adjustHeight(true);
   }, [
     input,
     status,
@@ -121,6 +149,7 @@ function PureChatInput({
     userId,
     createMessage,
     createThread,
+    navigate,
   ]);
 
   if (!canChat) {
@@ -162,6 +191,7 @@ function PureChatInput({
                 onChange={handleInputChange}
                 aria-label="Chat message input"
                 aria-describedby="chat-input-description"
+                disabled={status !== 'ready' || isSubmittingRef.current}
               />
               <span id="chat-input-description" className="sr-only">
                 Press Enter to send, Shift+Enter for new line
@@ -172,10 +202,13 @@ function PureChatInput({
               <div className="flex items-center justify-between w-full">
                 <ChatModelDropdown />
 
-                {status === 'submitted' || status === 'streaming' ? (
+                {status === 'streaming' ? (
                   <StopButton stop={stop} />
                 ) : (
-                  <SendButton onSubmit={handleSubmit} disabled={isDisabled} />
+                  <SendButton 
+                    onSubmit={handleSubmit} 
+                    disabled={isDisabled} 
+                  />
                 )}
               </div>
             </div>
@@ -190,6 +223,7 @@ const ChatInput = memo(PureChatInput, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   if (prevProps.status !== nextProps.status) return false;
   if (prevProps.userId !== nextProps.userId) return false;
+  if (prevProps.threadId !== nextProps.threadId) return false;
   return true;
 });
 

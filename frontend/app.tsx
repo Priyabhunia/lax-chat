@@ -46,7 +46,7 @@ const router = createBrowserRouter(
   }
 );
 
-export default function App() {
+function App() {
   return (
     <ConvexProvider client={convex}>
       <ConvexAuthProvider>
@@ -55,3 +55,5 @@ export default function App() {
     </ConvexProvider>
   );
 }
+
+export default App;

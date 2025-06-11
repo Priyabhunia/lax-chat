@@ -34,11 +34,13 @@ export default function Thread() {
     });
   };
 
+  const uiMessages = convertToUIMessages(messages);
+
   return (
     <Chat
       key={id}
       threadId={id}
-      initialMessages={convertToUIMessages(messages)}
+      initialMessages={uiMessages}
     />
   );
 }
