@@ -46,7 +46,7 @@ pnpm install
 
 #### b. Initialize Convex in your project
 ```bash
-npx convex init
+npx convex dev
 ```
 - Follow the prompts to log in and select your project
 
