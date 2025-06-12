@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/frontend/providers/ConvexAuthProvider';
@@ -17,6 +17,17 @@ import { SidebarTrigger } from '@/frontend/components/ui/sidebar';
 import { useChatNavigator } from '@/frontend/hooks/useChatNavigator';
 import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHelpers';
 
+// Helper function to scroll to the bottom of the container
+const scrollToBottom = () => {
+  const messagesContainer = document.querySelector('main');
+  if (messagesContainer) {
+    messagesContainer.scrollTo({
+      top: messagesContainer.scrollHeight,
+      behavior: 'smooth'
+    });
+  }
+};
+
 interface ChatProps {
   threadId: string;
   initialMessages: UIMessage[];
@@ -31,6 +42,7 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   const updateThread = useUpdateThread();
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
     isNavigatorVisible,
@@ -39,6 +51,17 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     registerRef,
     scrollToMessage,
   } = useChatNavigator();
+
+  // Function to scroll to bottom of messages
+  const scrollToBottom = useCallback(() => {
+    const messagesContainer = document.querySelector('main');
+    if (messagesContainer) {
+      messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
 
   // Get API key for the selected model
   const apiKey = getKey(modelConfig.provider);
@@ -83,11 +106,20 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
 
       try {
         await createMessage(threadId, aiMessage, user.userId);
+        // Scroll to bottom when message is finished
+        scrollToBottom();
       } catch (error) {
         console.error(error);
       }
     }
   });
+
+  // Auto-scroll when messages change or when streaming
+  useEffect(() => {
+    if (messages.length > 0 || status === 'streaming') {
+      scrollToBottom();
+    }
+  }, [messages, status, scrollToBottom]);
 
   // Custom submit handler for direct API calls
   const handleSubmit = async (userMessage: string) => {
@@ -108,6 +140,9 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     // Add user message to UI
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
+    
+    // Scroll to bottom after adding user message
+    setTimeout(scrollToBottom, 100);
     
     // Save user message to database
     try {
@@ -149,6 +184,9 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       
       // Save AI message to database
       await createMessage(threadId, aiMsg, user?.userId || '');
+      
+      // Scroll to bottom after adding AI message
+      setTimeout(scrollToBottom, 100);
       
     } catch (error) {
       console.error("API Error:", error);
@@ -221,7 +259,7 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     <div className="relative w-full">
       <SidebarTrigger />
       <main
-        className={`flex flex-col w-full max-w-3xl pt-10 pb-44 mx-auto transition-all duration-300 ease-in-out`}
+        className={`flex flex-col w-full max-w-3xl pt-10 pb-44 mx-auto transition-all duration-300 ease-in-out overflow-y-auto`}
       >
         {errorMessage && (
           <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
@@ -245,6 +283,9 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
           registerRef={registerRef}
           stop={() => setIsGenerating(false)}
         />
+        
+        {/* Invisible div at the end to scroll to */}
+        <div ref={messagesEndRef} />
         
         <div className="chat-input-container">
           <ChatInput

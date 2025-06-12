@@ -1,7 +1,7 @@
-import { Dispatch, SetStateAction, useState } from 'react';
+import { useState } from 'react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
-import { Check, Copy, RefreshCcw, SquarePen } from 'lucide-react';
+import { Check, Copy, RefreshCcw } from 'lucide-react';
 import { UIMessage } from 'ai';
 import { UseChatHelpers } from '@ai-sdk/react';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
@@ -17,7 +17,6 @@ interface MessageControlsProps {
   message: UIMessage;
   setMessages: UseChatHelpers['setMessages'];
   content: string;
-  setMode?: Dispatch<SetStateAction<'view' | 'edit'>>;
   reload: UseChatHelpers['reload'];
   stop: UseChatHelpers['stop'];
 }
@@ -27,7 +26,6 @@ export default function MessageControls({
   message,
   setMessages,
   content,
-  setMode,
   reload,
   stop,
 }: MessageControlsProps) {
@@ -242,11 +240,6 @@ export default function MessageControls({
       <Button variant="ghost" size="icon" onClick={handleCopy}>
         {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
       </Button>
-      {setMode && hasRequiredKeys && (
-        <Button variant="ghost" size="icon" onClick={() => setMode('edit')}>
-          <SquarePen className="w-4 h-4" />
-        </Button>
-      )}
       {hasRequiredKeys && (
         <Button 
           variant="ghost" 
