@@ -133,6 +133,10 @@ function ChatSidebar() {
             variant: "ghost", 
             className: "w-full flex items-center justify-center text-sm"
           })}
+          onClick={(e) => {
+            // Prevent default behavior to ensure clean navigation
+            e.stopPropagation();
+          }}
         >
           Settings
         </Link>

@@ -146,8 +146,23 @@ interface SidebarProps {
 
 export function Sidebar({ className, children }: SidebarProps) {
   const { isOpen, setIsOpen, isMobile, position } = useSidebar();
+  const sidebarRef = React.useRef<HTMLDivElement>(null);
   
   console.log("Sidebar rendering, position:", position);
+
+  // Add effect to log sidebar width changes
+  React.useEffect(() => {
+    console.log("Sidebar - State changed:", { isOpen, position });
+    
+    if (sidebarRef.current) {
+      const rect = sidebarRef.current.getBoundingClientRect();
+      console.log("Sidebar - Dimensions:", { 
+        width: rect.width, 
+        left: rect.left, 
+        right: rect.right 
+      });
+    }
+  }, [isOpen, position]);
 
   if (isMobile) {
     return (
@@ -161,6 +176,7 @@ export function Sidebar({ className, children }: SidebarProps) {
 
   return (
     <div
+      ref={sidebarRef}
       className={cn(
         'h-screen bg-background flex-shrink-0 transition-[width] duration-300 overflow-hidden',
         position === 'left' ? 'border-r' : 'border-l',

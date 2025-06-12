@@ -19,12 +19,30 @@ import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHel
 
 // Helper function to scroll to the bottom of the container
 const scrollToBottom = () => {
-  const messagesContainer = document.querySelector('main');
-  if (messagesContainer) {
-    messagesContainer.scrollTo({
-      top: messagesContainer.scrollHeight,
-      behavior: 'smooth'
-    });
+  // Try multiple possible scroll containers to ensure we find the right one
+  const scrollContainers = [
+    document.getElementById('chat-scroll-container'),
+    document.querySelector('.flex-1.overflow-auto'),
+    document.querySelector('main'),
+    document.querySelector('.overflow-auto')
+  ];
+  
+  // Try scrolling the container
+  for (const container of scrollContainers) {
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+      });
+      console.log('Scrolling container to bottom:', container, container.scrollHeight);
+      break;
+    }
+  }
+  
+  // Also try scrolling to the messages-end element
+  const messagesEnd = document.getElementById('messages-end');
+  if (messagesEnd) {
+    messagesEnd.scrollIntoView({ behavior: 'smooth' });
   }
 };
 
@@ -56,12 +74,30 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
 
   // Function to scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
-    const messagesContainer = document.querySelector('main');
-    if (messagesContainer) {
-      messagesContainer.scrollTo({
-        top: messagesContainer.scrollHeight,
-        behavior: 'smooth'
-      });
+    // Try multiple possible scroll containers to ensure we find the right one
+    const scrollContainers = [
+      document.getElementById('chat-scroll-container'),
+      document.querySelector('.flex-1.overflow-auto'),
+      document.querySelector('main'),
+      document.querySelector('.overflow-auto')
+    ];
+    
+    // Try scrolling the container
+    for (const container of scrollContainers) {
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+        console.log('Scrolling container to bottom:', container, container.scrollHeight);
+        break;
+      }
+    }
+    
+    // Also try scrolling to the messages-end element
+    const messagesEnd = document.getElementById('messages-end');
+    if (messagesEnd) {
+      messagesEnd.scrollIntoView({ behavior: 'smooth' });
     }
   }, []);
 
@@ -119,7 +155,19 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   // Auto-scroll when messages change or when streaming
   useEffect(() => {
     if (messages.length > 0 || status === 'streaming') {
+      // Immediate scroll attempt
       scrollToBottom();
+      
+      // Use the messagesEndRef to scroll if available
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+      
+      // Delayed scroll attempt to ensure content has rendered
+      setTimeout(scrollToBottom, 100);
+      
+      // Another delayed attempt for slower rendering
+      setTimeout(scrollToBottom, 300);
     }
   }, [messages, status, scrollToBottom]);
 
@@ -143,8 +191,10 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     
-    // Scroll to bottom after adding user message
-    setTimeout(scrollToBottom, 100);
+    // Scroll to bottom after adding user message - multiple attempts for reliability
+    scrollToBottom();
+    setTimeout(scrollToBottom, 50);
+    setTimeout(scrollToBottom, 150);
     
     // Save user message to database
     try {
@@ -187,8 +237,11 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       // Save AI message to database
       await createMessage(threadId, aiMsg, user?.userId || '');
       
-      // Scroll to bottom after adding AI message
-      setTimeout(scrollToBottom, 100);
+      // Scroll to bottom after adding AI message - multiple attempts for reliability
+      scrollToBottom();
+      setTimeout(scrollToBottom, 50);
+      setTimeout(scrollToBottom, 150);
+      setTimeout(scrollToBottom, 300);
       
     } catch (error) {
       console.error("API Error:", error);
@@ -259,62 +312,108 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   
   // Determine button position based on sidebar position
   const navigatorButtonPosition = position === 'right' ? 'left-16' : 'right-16';
+  
+  console.log('Chat rendering:', { position, navigatorButtonPosition });
+  
+  // Use useEffect to log when the component mounts
+  useEffect(() => {
+    console.log('Chat component mounted');
+    
+    // Log the navigator button element to check if it's in the DOM
+    setTimeout(() => {
+      const navButton = document.querySelector('button[aria-label="Show message navigator"]') || 
+                        document.querySelector('button[aria-label="Hide message navigator"]');
+      console.log('Navigator button found in DOM:', !!navButton);
+      
+      if (navButton) {
+        const rect = navButton.getBoundingClientRect();
+        console.log('Navigator button position:', { 
+          top: rect.top, 
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height
+        });
+      }
+      
+      // Check the main container's position and dimensions
+      const mainContainer = document.querySelector('.relative.w-full.flex.flex-col.items-center');
+      if (mainContainer) {
+        const rect = mainContainer.getBoundingClientRect();
+        console.log('Main container dimensions:', { 
+          top: rect.top, 
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    }, 500);
+    
+    return () => {
+      console.log('Chat component unmounted');
+    };
+  }, []);
 
   return (
-    <div className="relative w-full">
-      <SidebarTrigger />
-      <main
-        className={`flex flex-col w-full max-w-3xl pt-10 pb-44 mx-auto transition-all duration-300 ease-in-out overflow-y-auto`}
-      >
-        {errorMessage && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-            <div className="flex">
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  Error: {errorMessage}
-                </p>
+    <div className="relative w-full h-full flex flex-col">
+      <div className="flex-1 overflow-auto pb-48" id="chat-scroll-container">
+        <div className="flex flex-col items-center">
+          <SidebarTrigger />
+          <main
+            className={`flex flex-col w-full max-w-3xl pt-10 mx-auto transition-all duration-300 ease-in-out`}
+          >
+            {errorMessage && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">
+                      Error: {errorMessage}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-        
-        <Messages
-          threadId={threadId}
-          messages={messages}
-          status={chatStatus}
-          setMessages={setMessages}
-          reload={reload}
-          error={error}
-          registerRef={registerRef}
-          stop={() => setIsGenerating(false)}
-        />
-        
-        {/* Invisible div at the end to scroll to */}
-        <div ref={messagesEndRef} />
-      </main>
-      
-      <div className="chat-input-container fixed bottom-0 left-0 right-0 z-10">
-        <ChatInput
-          key={`chat-input-${threadId}`}
-          threadId={threadId}
-          input={input}
-          status={chatStatus}
-          append={(message) => {
-            handleSubmit(message.content);
-            return Promise.resolve(message.id);
-          }}
-          setInput={setInput}
-          stop={() => setIsGenerating(false)}
-          userId={user.userId}
-        />
+            )}
+            
+            <Messages
+              threadId={threadId}
+              messages={messages}
+              status={chatStatus}
+              setMessages={setMessages}
+              reload={reload}
+              error={error}
+              registerRef={registerRef}
+              stop={() => setIsGenerating(false)}
+            />
+            
+            {/* Invisible div at the end to scroll to */}
+            <div ref={messagesEndRef} className="h-1" id="messages-end" />
+          </main>
+        </div>
       </div>
+      
+      <ChatInput
+        key={`chat-input-${threadId}`}
+        threadId={threadId}
+        input={input}
+        status={chatStatus}
+        append={(message) => {
+          handleSubmit(message.content);
+          return Promise.resolve(message.id);
+        }}
+        setInput={setInput}
+        stop={() => setIsGenerating(false)}
+        userId={user.userId}
+      />
       
       <ThemeToggler />
       <Button
         onClick={handleToggleNavigator}
         variant="outline"
         size="icon"
-        className={`fixed ${navigatorButtonPosition} top-4 z-20`}
+        className={`fixed ${navigatorButtonPosition} top-4 z-50`}
         aria-label={
           isNavigatorVisible
             ? 'Hide message navigator'

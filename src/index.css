@@ -119,27 +119,27 @@ body {
   left: 0;
   right: 0;
   width: 100%;
-  display: flex;
-  justify-content: center;
   z-index: 10;
-  pointer-events: none;
-}
-
-.chat-input-container > * {
-  pointer-events: auto;
-  max-width: 48rem;
-  width: 100%;
+  /* align-content:auto-center; */
+  
 }
 
 /* Hide any duplicate input elements */
 .chat-input-container ~ .chat-input-container {
   display: none;
-} 
+}
 
 /* Sidebar container styling */
 .sidebar-container {
-  border-right: 1px solid var(--border);
-  border-left: 1px solid var(--border);
+  border-right: 0px solid var(--border);
+  border-left: 0px solid var(--border);
+  z-index: 20;
+}
+
+/* Ensure sidebar footer links are clickable */
+.sidebar-container a {
+  position: relative;
+  z-index: 25;
 }
 
 /* Sidebar position classes */

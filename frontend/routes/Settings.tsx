@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { buttonVariants } from '../components/ui/button';
 import { ArrowLeftIcon, LogOut, User } from 'lucide-react';
 import { useAuth } from '../providers/ConvexAuthProvider';
+import { useSidebar } from '../components/ui/sidebar';
 import { 
   Card, 
   CardContent, 
@@ -17,11 +18,15 @@ export default function Settings() {
   const chatId = searchParams.get("from");
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { position } = useSidebar();
 
   const handleLogout = () => {
     logout();
     navigate('/auth');
   };
+  
+  // Adjust back button position based on sidebar position
+  const backButtonPosition = position === 'right' ? 'right-40' : 'left-40';
 
   return (
     <section className="flex flex-col w-full h-full">
@@ -29,7 +34,7 @@ export default function Settings() {
         to={chatId ? `/chat/${chatId}` : "/chat"}
         className={buttonVariants({
           variant: 'default',
-          className: 'w-fit fixed top-10 left-40 z-10',
+          className: `w-fit fixed top-10 ${backButtonPosition} z-10`,
         })}
       >
         <ArrowLeftIcon className="w-4 h-4 mr-2" />

@@ -23,6 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { StopIcon } from './ui/icons';
 import { toast } from 'sonner';
 import { useMessageSummary } from '../hooks/useMessageSummary';
+import { useSidebar } from './ui/sidebar';
 
 // Declare global types for our submission tracking
 declare global {
@@ -80,6 +81,7 @@ function PureChatInput({
   const createMessage = useCreateMessage();
   const createThread = useCreateThread();
   const isSubmittingRef = useRef(false);
+  const { isOpen: sidebarIsOpen, position: sidebarPosition } = useSidebar();
 
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 72,
@@ -88,6 +90,25 @@ function PureChatInput({
 
   const navigate = useNavigate();
   const { id } = useParams();
+
+  // Add logging to track sidebar state and input positioning
+  useEffect(() => {
+    console.log("ChatInput - Sidebar state:", { 
+      isOpen: sidebarIsOpen, 
+      position: sidebarPosition 
+    });
+    
+    // Log the current dimensions of the chat input container
+    const inputContainer = document.querySelector('.fixed.bottom-0.left-0.right-0');
+    if (inputContainer) {
+      const rect = inputContainer.getBoundingClientRect();
+      console.log("ChatInput - Container dimensions:", { 
+        width: rect.width, 
+        left: rect.left, 
+        right: rect.right 
+      });
+    }
+  }, [sidebarIsOpen, sidebarPosition]);
 
   const isDisabled = useMemo(
     () => !input.trim() || status !== 'ready' || isSubmittingRef.current,
@@ -169,47 +190,49 @@ function PureChatInput({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-3xl">
-      <div className="bg-secondary rounded-t-[20px] p-2 pb-0 w-full">
-        <div className="relative">
-          <div className="flex flex-col">
-            <div className="bg-secondary overflow-y-auto max-h-[300px]">
-              <Textarea
-                id="chat-input"
-                value={input}
-                placeholder="What can I do for you?"
-                className={cn(
-                  'w-full px-4 py-3 border-none shadow-none dark:bg-transparent',
-                  'placeholder:text-muted-foreground resize-none',
-                  'focus-visible:ring-0 focus-visible:ring-offset-0',
-                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30',
-                  'scrollbar-thumb-rounded-full',
-                  'min-h-[72px]'
-                )}
-                ref={textareaRef}
-                onKeyDown={handleKeyDown}
-                onChange={handleInputChange}
-                aria-label="Chat message input"
-                aria-describedby="chat-input-description"
-                disabled={status !== 'ready' || isSubmittingRef.current}
-              />
-              <span id="chat-input-description" className="sr-only">
-                Press Enter to send, Shift+Enter for new line
-              </span>
-            </div>
+    <div className="fixed bottom-0 left-0 right-0 mx-auto w-full z-10">
+      <div className="mx-auto max-w-3xl">
+        <div className="bg-secondary rounded-t-[20px] p-2 pb-0 shadow-lg">
+          <div className="relative">
+            <div className="flex flex-col">
+              <div className="bg-secondary overflow-y-auto max-h-[300px]">
+                <Textarea
+                  id="chat-input"
+                  value={input}
+                  placeholder="What can I do for you?"
+                  className={cn(
+                    'w-full px-4 py-3 border-none shadow-none dark:bg-transparent',
+                    'placeholder:text-muted-foreground resize-none',
+                    'focus-visible:ring-0 focus-visible:ring-offset-0',
+                    'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30',
+                    'scrollbar-thumb-rounded-full',
+                    'min-h-[72px]'
+                  )}
+                  ref={textareaRef}
+                  onKeyDown={handleKeyDown}
+                  onChange={handleInputChange}
+                  aria-label="Chat message input"
+                  aria-describedby="chat-input-description"
+                  disabled={status !== 'ready' || isSubmittingRef.current}
+                />
+                <span id="chat-input-description" className="sr-only">
+                  Press Enter to send, Shift+Enter for new line
+                </span>
+              </div>
 
-            <div className="h-14 flex items-center px-2">
-              <div className="flex items-center justify-between w-full">
-                <ChatModelDropdown />
+              <div className="h-14 flex items-center px-2">
+                <div className="flex items-center justify-between w-full">
+                  <ChatModelDropdown />
 
-                {status === 'streaming' ? (
-                  <StopButton stop={stop} />
-                ) : (
-                  <SendButton 
-                    onSubmit={handleSubmit} 
-                    disabled={isDisabled} 
-                  />
-                )}
+                  {status === 'streaming' ? (
+                    <StopButton stop={stop} />
+                  ) : (
+                    <SendButton 
+                      onSubmit={handleSubmit} 
+                      disabled={isDisabled} 
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
