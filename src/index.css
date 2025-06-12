@@ -33,6 +33,7 @@
     --sidebar-muted-foreground: 240 3.8% 46.1%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-width: 280px;
   }
  
   .dark {
@@ -113,12 +114,57 @@ body {
 
 /* Fix for chat input double rendering */
 .chat-input-container {
-  position: relative;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
+  display: flex;
+  justify-content: center;
   z-index: 10;
+  pointer-events: none;
+}
+
+.chat-input-container > * {
+  pointer-events: auto;
+  max-width: 48rem;
+  width: 100%;
 }
 
 /* Hide any duplicate input elements */
 .chat-input-container ~ .chat-input-container {
   display: none;
+} 
+
+/* Sidebar container styling */
+.sidebar-container {
+  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+/* Sidebar position classes */
+.sidebar-left {
+  order: -1;
+}
+
+.sidebar-right {
+  order: 1;
+}
+
+/* Sidebar position transition */
+.sidebar-transition {
+  /* Use will-change to optimize rendering */
+  will-change: transform, width;
+  /* Separate transitions for different properties */
+  transition: width 300ms ease, transform 300ms ease;
+}
+
+/* Ensure child elements don't inherit order changes */
+.order-none {
+  order: 0 !important;
+}
+
+/* Prevent layout shifts during transitions */
+.flex {
+  contain: layout;
 } 

@@ -13,7 +13,7 @@ import ChatNavigator from './ChatNavigator';
 import { MessageSquareMore } from 'lucide-react';
 import { toast } from 'sonner';
 import ThemeToggler from '@/frontend/components/ui/ThemeToggler';
-import { SidebarTrigger } from '@/frontend/components/ui/sidebar';
+import { SidebarTrigger, useSidebar } from '@/frontend/components/ui/sidebar';
 import { useChatNavigator } from '@/frontend/hooks/useChatNavigator';
 import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHelpers';
 
@@ -51,6 +51,8 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     registerRef,
     scrollToMessage,
   } = useChatNavigator();
+
+  const { position } = useSidebar();
 
   // Function to scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
@@ -254,6 +256,9 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
 
   // Map our isGenerating state to valid status values expected by components
   const chatStatus = isGenerating ? 'streaming' : 'ready';
+  
+  // Determine button position based on sidebar position
+  const navigatorButtonPosition = position === 'right' ? 'left-16' : 'right-16';
 
   return (
     <div className="relative w-full">
@@ -286,30 +291,30 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
         
         {/* Invisible div at the end to scroll to */}
         <div ref={messagesEndRef} />
-        
-        <div className="chat-input-container">
-          <ChatInput
-            key={`chat-input-${threadId}`}
-            threadId={threadId}
-            input={input}
-            status={chatStatus}
-            append={(message) => {
-              handleSubmit(message.content);
-              return Promise.resolve(message.id);
-            }}
-            setInput={setInput}
-            stop={() => setIsGenerating(false)}
-            userId={user.userId}
-          />
-        </div>
       </main>
+      
+      <div className="chat-input-container fixed bottom-0 left-0 right-0 z-10">
+        <ChatInput
+          key={`chat-input-${threadId}`}
+          threadId={threadId}
+          input={input}
+          status={chatStatus}
+          append={(message) => {
+            handleSubmit(message.content);
+            return Promise.resolve(message.id);
+          }}
+          setInput={setInput}
+          stop={() => setIsGenerating(false)}
+          userId={user.userId}
+        />
+      </div>
       
       <ThemeToggler />
       <Button
         onClick={handleToggleNavigator}
         variant="outline"
         size="icon"
-        className="fixed right-16 top-4 z-20"
+        className={`fixed ${navigatorButtonPosition} top-4 z-20`}
         aria-label={
           isNavigatorVisible
             ? 'Hide message navigator'

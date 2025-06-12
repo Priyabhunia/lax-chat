@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { useMessageSummaries } from '../hooks/useConvexData';
 import { useAuth } from '../providers/ConvexAuthProvider';
+import { useSidebar } from './ui/sidebar';
 
 interface MessageNavigatorProps {
   threadId: string;
@@ -18,7 +19,11 @@ function PureChatNavigator({
   onClose,
 }: MessageNavigatorProps) {
   const { user } = useAuth();
+  const { position } = useSidebar();
   const messageSummaries = useMessageSummaries(threadId);
+  
+  // Determine the position based on sidebar position
+  const navigatorPosition = position === 'right' ? 'left-0' : 'right-0';
 
   return (
     <>
@@ -30,8 +35,12 @@ function PureChatNavigator({
       )}
 
       <aside
-        className={`fixed right-0 top-0 h-full w-80 bg-background border-l z-50 transform transition-transform duration-300 ease-in-out ${
-          isVisible ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed ${navigatorPosition} top-0 h-full w-80 bg-background border-l border-r z-50 transform transition-transform duration-300 ease-in-out ${
+          isVisible 
+            ? 'translate-x-0' 
+            : position === 'right' 
+              ? '-translate-x-full' 
+              : 'translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">

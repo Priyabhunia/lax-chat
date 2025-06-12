@@ -35,6 +35,8 @@ type SidebarContextProps = {
   setIsOpen: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  position: 'left' | 'right';
+  togglePosition: () => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -58,24 +60,21 @@ export function SidebarProvider({
 }: SidebarProviderProps) {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
+  const [position, setPosition] = React.useState<'left' | 'right'>('left');
 
+  // Load initial state from localStorage on mount only
   React.useEffect(() => {
-    // Save sidebar state to localStorage
-    const handleStateChange = () => {
-      try {
-        localStorage.setItem('sidebar_state', isOpen ? 'open' : 'closed');
-      } catch (error) {
-        console.error('Failed to save sidebar state:', error);
-      }
-    };
-
-    // Try to load initial state from localStorage
     try {
       const savedState = localStorage.getItem('sidebar_state');
       if (savedState === 'open') {
         setIsOpen(true);
       } else if (savedState === 'closed') {
         setIsOpen(false);
+      }
+      
+      const savedPosition = localStorage.getItem('sidebar_position');
+      if (savedPosition === 'left' || savedPosition === 'right') {
+        setPosition(savedPosition);
       }
     } catch (error) {
       console.error('Failed to load sidebar state:', error);
@@ -101,10 +100,24 @@ export function SidebarProvider({
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('toggle-sidebar', handleCustomEvent);
     };
-  }, [isOpen]); // Added isOpen as dependency to trigger handleStateChange
+  }, []); // Only run on mount
+
+  // Save to localStorage whenever state changes
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_state', isOpen ? 'open' : 'closed');
+      localStorage.setItem('sidebar_position', position);
+    } catch (error) {
+      console.error('Failed to save sidebar state:', error);
+    }
+  }, [isOpen, position]);
 
   const toggleSidebar = React.useCallback(() => {
-    setIsOpen((prev) => !prev);
+    setIsOpen(prev => !prev);
+  }, []);
+  
+  const togglePosition = React.useCallback(() => {
+    setPosition(prev => (prev === 'left' ? 'right' : 'left'));
   }, []);
 
   const contextValue = React.useMemo(
@@ -113,8 +126,10 @@ export function SidebarProvider({
       setIsOpen,
       isMobile,
       toggleSidebar,
+      position,
+      togglePosition,
     }),
-    [isOpen, setIsOpen, isMobile, toggleSidebar]
+    [isOpen, setIsOpen, isMobile, toggleSidebar, position, togglePosition]
   );
 
   return (
@@ -130,12 +145,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className, children }: SidebarProps) {
-  const { isOpen, setIsOpen, isMobile } = useSidebar();
+  const { isOpen, setIsOpen, isMobile, position } = useSidebar();
+  
+  console.log("Sidebar rendering, position:", position);
 
   if (isMobile) {
     return (
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetContent side="left" className="w-[280px] p-0 border-r">
+        <SheetContent side={position} className="w-[280px] p-0 border-r border-l">
           <div className="flex h-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>
@@ -145,12 +162,14 @@ export function Sidebar({ className, children }: SidebarProps) {
   return (
     <div
       className={cn(
-        'h-screen bg-background border-r flex-shrink-0 transition-all duration-300 overflow-hidden',
-        isOpen ? 'w-[280px]' : 'w-0',
+        'h-screen bg-background flex-shrink-0 transition-[width] duration-300 overflow-hidden',
+        position === 'left' ? 'border-r' : 'border-l',
+        position === 'left' ? 'order-first' : 'order-last',
         className
       )}
+      style={{ width: isOpen ? '280px' : '0px' }}
     >
-      <div className="flex h-full flex-col">{children}</div>
+      <div className="flex h-full flex-col order-none">{children}</div>
     </div>
   );
 }

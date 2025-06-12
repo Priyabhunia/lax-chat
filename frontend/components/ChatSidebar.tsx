@@ -9,7 +9,7 @@ import {
 import { Button, buttonVariants } from './ui/button';
 import { useThreads, useDeleteThread } from '@/frontend/hooks/useConvexData';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { X, Square } from 'lucide-react';
+import { X, Square, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { memo } from 'react';
 import { useAuth } from '../providers/ConvexAuthProvider';
@@ -20,7 +20,7 @@ function ChatSidebar() {
   const { user } = useAuth();
   const threads = useThreads(user?.userId);
   const deleteThread = useDeleteThread();
-  const { isOpen, toggleSidebar } = useSidebar();
+  const { isOpen, toggleSidebar, position, togglePosition } = useSidebar();
 
   if (!user) return null;
 
@@ -29,22 +29,45 @@ function ChatSidebar() {
     return null;
   }
 
+  // Use a simple class name without conditional rendering
   return (
-    <Sidebar className="border-r border-border/50">
+    <Sidebar className="sidebar-container">
       <SidebarHeader className="border-b border-border/50 p-2 flex justify-between items-center">
         <h1 className="text-xl font-bold">
           Chat<span className="text-blue-500">0</span>
         </h1>
-        {/* Toggle button on right side of sidebar */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 flex"
-          onClick={toggleSidebar}
-          aria-label="Toggle Sidebar"
-        >
-          <Square className="h-4 w-4" />
-        </Button>
+        {/* Use a fixed order for the buttons container */}
+        <div className="flex gap-1 order-none">
+          {/* Position toggle button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 flex"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              togglePosition();
+            }}
+            aria-label="Toggle Sidebar Position"
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+          </Button>
+          
+          {/* Close button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 flex"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleSidebar();
+            }}
+            aria-label="Toggle Sidebar"
+          >
+            <Square className="h-4 w-4" />
+          </Button>
+        </div>
       </SidebarHeader>
       
       <SidebarContent className="p-2 flex flex-col gap-1">
