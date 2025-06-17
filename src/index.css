@@ -4,9 +4,9 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 120 70% 95%; /* Light green background */
     --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
+    --card: 0 0% 100%; /* Keep cards white for contrast */
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
@@ -26,7 +26,7 @@
     --radius: 0.5rem;
     
     /* Sidebar Variables */
-    --sidebar: 0 0% 100%;
+    --sidebar: 120 45% 82%; /* Darker green for the sidebar with higher saturation and lower lightness */
     --sidebar-foreground: 240 10% 3.9%;
     --sidebar-border: 240 5.9% 90%;
     --sidebar-muted: 240 4.8% 95.9%;
@@ -37,34 +37,34 @@
   }
  
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 120 40% 15%; /* Dark green background */
+    --foreground: 120 15% 95%; /* Light text for contrast */
+    --card: 120 40% 20%; /* Slightly lighter dark green for cards */
+    --card-foreground: 120 10% 95%;
+    --popover: 120 40% 20%;
+    --popover-foreground: 120 10% 95%;
+    --primary: 120 70% 40%; /* Bright green for primary elements */
+    --primary-foreground: 120 5% 95%;
+    --secondary: 120 30% 30%;
+    --secondary-foreground: 120 5% 95%;
+    --muted: 120 30% 25%;
+    --muted-foreground: 120 10% 75%;
+    --accent: 120 30% 35%;
+    --accent-foreground: 120 5% 95%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.5% 48%;
+    --destructive-foreground: 120 5% 95%;
+    --border: 120 30% 25%;
+    --input: 120 30% 25%;
+    --ring: 120 70% 40%;
     
     /* Sidebar Variables - Dark Mode */
-    --sidebar: 240 10% 3.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-muted: 240 3.7% 15.9%;
-    --sidebar-muted-foreground: 240 5% 64.9%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar: 120 30% 10%; /* Darker green for the sidebar */
+    --sidebar-foreground: 120 5% 90%;
+    --sidebar-border: 120 40% 20%;
+    --sidebar-muted: 120 40% 20%;
+    --sidebar-muted-foreground: 120 10% 75%;
+    --sidebar-accent: 120 40% 25%;
+    --sidebar-accent-foreground: 120 5% 90%;
   }
 }
 
@@ -134,6 +134,7 @@ body {
   border-right: 0px solid var(--border);
   border-left: 0px solid var(--border);
   z-index: 20;
+  background-color: hsl(var(--sidebar)) !important; /* Force the sidebar background color */
 }
 
 /* Ensure sidebar footer links are clickable */
@@ -167,4 +168,98 @@ body {
 /* Prevent layout shifts during transitions */
 .flex {
   contain: layout;
+}
+
+/* Dark mode specific styles */
+.dark .bg-card {
+  background-color: hsl(var(--card));
+}
+
+.dark .border {
+  border-color: hsl(var(--border));
+}
+
+/* Ensure card backgrounds use the card variable in dark mode */
+.dark [class*="card"] {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+
+/* Ensure inputs have proper styling in dark mode */
+.dark input, 
+.dark textarea, 
+.dark select {
+  background-color: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Ensure buttons have proper styling in dark mode */
+.dark button:not([class*="bg-"]) {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* Make thread names bolder in dark mode */
+.dark .sidebar-container .group\/thread span {
+  font-weight: 600; /* Slightly bolder */
+  letter-spacing: 0.01em; /* Slightly improved readability */
+}
+
+/* Add a subtle text shadow for better visibility in dark mode */
+.dark .sidebar-container .group\/thread span {
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Make "New Chat" button text slightly bolder in dark mode */
+.dark .sidebar-container a[href="/chat"] {
+  font-weight: 600;
+}
+
+/* Ensure "New Chat" button is always NAVI blue regardless of theme */
+.sidebar-container a[href="/chat"] {
+  background-color: #092c59 !important;
+  color: white !important;
+}
+
+.sidebar-container a[href="/chat"]:hover {
+  background-color: #062048 !important;
+}
+
+/* Style the sidebar trigger button for better visibility */
+button[aria-label="Toggle Sidebar"] {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark button[aria-label="Toggle Sidebar"] {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+button[aria-label="Toggle Sidebar"]:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dark button[aria-label="Toggle Sidebar"]:hover {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Hide or style React DevTools buttons in dark mode */
+.dark [data-testid="devtools-button"],
+.dark button[data-testid*="devtools"],
+.dark button.button-p-2 {
+  background-color: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  opacity: 0.7;
+}
+
+/* When hovering, make it slightly more visible */
+.dark [data-testid="devtools-button"]:hover,
+.dark button[data-testid*="devtools"]:hover,
+.dark button.button-p-2:hover {
+  opacity: 1;
+  background-color: hsl(var(--accent)) !important;
 } 

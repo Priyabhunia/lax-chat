@@ -3,8 +3,6 @@ import { UIMessage } from 'ai';
 // Helper function to call Google Gemini API directly
 export const callGeminiAPI = async (messages: UIMessage[], apiKey: string, modelId: string) => {
   try {
-    console.log("Calling Gemini API with model:", modelId);
-    
     // Format messages for Gemini
     const formattedMessages = messages.map(msg => ({
       role: msg.role,
@@ -13,7 +11,6 @@ export const callGeminiAPI = async (messages: UIMessage[], apiKey: string, model
 
     // Make sure to use the correct API endpoint format based on the model ID
     const endpoint = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${apiKey}`;
-    console.log("Using Gemini endpoint:", endpoint);
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -33,7 +30,6 @@ export const callGeminiAPI = async (messages: UIMessage[], apiKey: string, model
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error("Gemini API error response:", errorData);
       throw new Error(`API error: ${response.status} ${response.statusText} - ${errorData}`);
     }
 
@@ -41,12 +37,10 @@ export const callGeminiAPI = async (messages: UIMessage[], apiKey: string, model
     
     // Check if candidates array exists and has content
     if (!data.candidates || data.candidates.length === 0) {
-      console.error("No candidates in response:", data);
       throw new Error("No response generated from the model");
     }
     
     if (!data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
-      console.error("No content parts in response:", data.candidates[0]);
       throw new Error("Invalid response format from the model");
     }
     
@@ -99,7 +93,7 @@ export const callOpenRouterAPI = async (messages: UIMessage[], apiKey: string, m
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
       'HTTP-Referer': window.location.origin,
-      'X-Title': 'Chat0'
+      'X-Title': 'lax'
     },
     body: JSON.stringify({
       model: modelId,

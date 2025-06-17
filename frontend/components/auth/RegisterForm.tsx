@@ -1,21 +1,46 @@
 import { useState } from "react";
-import { useAuth } from "../../providers/ConvexAuthProvider";
+import { useAuth } from "../../providers/SupabaseAuthProvider";
 
 export function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const { register, isLoading } = useAuth();
+  const [message, setMessage] = useState("");
+  const { register, isLoading, refreshSession } = useAuth();
+
+  console.log("[DEBUG] RegisterForm rendered, isLoading:", isLoading);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
+    
+    console.log("[DEBUG] Registration attempt with:", { email, name, passwordLength: password.length });
     
     try {
+      console.log("[DEBUG] Calling register function...");
       await register(email, password, name || undefined);
+      console.log("[DEBUG] Register function completed successfully");
+      
+      // Show success message
+      setMessage("Registration successful! Please wait...");
+      
+      // Try to refresh session to ensure it's available
+      try {
+        console.log("[DEBUG] Refreshing session after registration");
+        await refreshSession();
+      } catch (refreshError) {
+        console.error("[DEBUG] Error refreshing session:", refreshError);
+      }
+      
     } catch (err: any) {
-      setError(err.message || "Registration failed");
+      console.error("[DEBUG] Registration error:", err);
+      if (err.message?.includes('email')) {
+        setError("This email may already be registered. Please try logging in.");
+      } else {
+        setError(err.message || "Registration failed");
+      }
     }
   };
 
@@ -26,6 +51,22 @@ export function RegisterForm() {
       {error && (
         <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
           {error}
+          {error.includes('email') && (
+            <div className="mt-2">
+              <button 
+                className="text-blue-700 underline text-sm"
+                onClick={() => window.location.reload()}
+              >
+                Go to login
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {message && (
+        <div className="mb-4 p-2 bg-green-100 text-green-700 rounded">
+          {message}
         </div>
       )}
       
@@ -69,6 +110,7 @@ export function RegisterForm() {
             className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
+          <p className="mt-1 text-xs text-gray-500">Password must be at least 6 characters</p>
         </div>
         
         <button

@@ -7,6 +7,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    headers: {
+      // Adding CORS headers to help development
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization, apikey"
+    },
   },
   resolve: {
     alias: {
@@ -15,9 +21,5 @@ export default defineConfig({
       '@/lib': path.resolve(__dirname, './lib'),
       '@/hooks': path.resolve(__dirname, './hooks'),
     },
-  },
-  // Define environment variables
-  define: {
-    'import.meta.env.VITE_CONVEX_URL': JSON.stringify(process.env.VITE_CONVEX_URL || 'https://silent-snail-247.convex.cloud'),
   },
 }); 

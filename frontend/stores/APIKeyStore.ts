@@ -36,7 +36,7 @@ export const useAPIKeyStore = create<APIKeyStore>()(
   persist(
     (set, get) => ({
       keys: {
-        google: '',
+        google: 'TEST_KEY_FOR_DEVELOPMENT',
         openrouter: '',
         openai: '',
       },
@@ -48,7 +48,8 @@ export const useAPIKeyStore = create<APIKeyStore>()(
       },
 
       hasRequiredKeys: () => {
-        return !!get().keys.google;
+        const googleKey = get().keys.google;
+        return !!googleKey && googleKey.length > 0;
       },
 
       getKey: (provider) => {

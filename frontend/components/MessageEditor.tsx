@@ -7,8 +7,8 @@ import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 import { toast } from 'sonner';
-import { useCreateMessage, useCreateMessageSummary } from '../hooks/useConvexData';
-import { useAuth } from '../providers/ConvexAuthProvider';
+import { useCreateMessage, useCreateMessageSummary } from '../hooks/useSupabaseData';
+import { useAuth } from '../providers/SupabaseAuthProvider';
 
 export default function MessageEditor({
   threadId,

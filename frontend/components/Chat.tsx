@@ -1,57 +1,51 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { v4 as uuidv4 } from 'uuid';
-import { useAuth } from '@/frontend/providers/ConvexAuthProvider';
-import { useCreateMessage, useUpdateThread } from '@/frontend/hooks/useConvexData';
+import { useAuth } from '../providers/SupabaseAuthProvider';
+import { useCreateMessage, useUpdateThread, useCreateMessageSummary, useMessages, useMessageSummaries } from '../hooks/useSupabaseData';
 import { UIMessage } from 'ai';
-import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
-import { useModelStore } from '@/frontend/stores/ModelStore';
+import { useAPIKeyStore } from '../stores/APIKeyStore';
+import { useModelStore } from '../stores/ModelStore';
 import { Button } from './ui/button';
 import Messages from './Messages';
 import ChatInput from './ChatInput';
 import ChatNavigator from './ChatNavigator';
 import { MessageSquareMore } from 'lucide-react';
 import { toast } from 'sonner';
-import ThemeToggler from '@/frontend/components/ui/ThemeToggler';
-import { SidebarTrigger, useSidebar } from '@/frontend/components/ui/sidebar';
-import { useChatNavigator } from '@/frontend/hooks/useChatNavigator';
+import ThemeToggler from './ui/ThemeToggler';
+import { SidebarTrigger, useSidebar } from './ui/sidebar';
+import { useChatNavigator } from '../hooks/useChatNavigator';
 import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHelpers';
-
-// Helper function to scroll to the bottom of the container
-const scrollToBottom = () => {
-  // Try multiple possible scroll containers to ensure we find the right one
-  const scrollContainers = [
-    document.getElementById('chat-scroll-container'),
-    document.querySelector('.flex-1.overflow-auto'),
-    document.querySelector('main'),
-    document.querySelector('.overflow-auto')
-  ];
-  
-  // Try scrolling the container
-  for (const container of scrollContainers) {
-    if (container) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth'
-      });
-      console.log('Scrolling container to bottom:', container, container.scrollHeight);
-      break;
-    }
-  }
-  
-  // Also try scrolling to the messages-end element
-  const messagesEnd = document.getElementById('messages-end');
-  if (messagesEnd) {
-    messagesEnd.scrollIntoView({ behavior: 'smooth' });
-  }
-};
+import { useMessageSummary } from '../hooks/useMessageSummary';
+import { useSupabaseMutation } from '../hooks/useSupabaseQuery';
+import { useSupabase } from '../providers/SupabaseProvider';
+// We don't need Convex imports since we're migrating to Supabase
+// The necessary Supabase functionality is already available through the useAuth hook
 
 interface ChatProps {
   threadId: string;
   initialMessages: UIMessage[];
 }
 
-export default function Chat({ threadId, initialMessages }: ChatProps) {
+// Helper function to create a summary from message content
+const createSummaryFromMessage = (content: string): string => {
+  // Truncate to first 50 characters or less
+  const maxLength = 50;
+  let summary = content.trim();
+  
+  // Remove markdown formatting
+  summary = summary.replace(/[#*_~`]/g, '');
+  
+  // Truncate if needed and add ellipsis
+  if (summary.length > maxLength) {
+    const truncated = summary.substring(0, maxLength).trim();
+    return truncated + '...';
+  }
+  
+  return summary;
+};
+
+const Chat = memo(function Chat({ threadId, initialMessages }: ChatProps) {
   const { getKey } = useAPIKeyStore();
   const selectedModel = useModelStore((state) => state.selectedModel);
   const modelConfig = useModelStore((state) => state.getModelConfig());
@@ -61,17 +55,11 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const {
-    isNavigatorVisible,
-    handleToggleNavigator,
-    closeNavigator,
-    registerRef,
-    scrollToMessage,
-  } = useChatNavigator();
-
-  const { position } = useSidebar();
-
+  const { complete: createSummary } = useMessageSummary();
+  const createMessageSummary = useCreateMessageSummary();
+  const supabase = useSupabase();
+  const prevPropsRef = useRef({ threadId, initialMessagesLength: initialMessages.length });
+  
   // Function to scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
     // Try multiple possible scroll containers to ensure we find the right one
@@ -89,7 +77,6 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
           top: container.scrollHeight,
           behavior: 'smooth'
         });
-        console.log('Scrolling container to bottom:', container, container.scrollHeight);
         break;
       }
     }
@@ -100,20 +87,76 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       messagesEnd.scrollIntoView({ behavior: 'smooth' });
     }
   }, []);
+  
+  // Update refs for next render comparison
+  useEffect(() => {
+    prevPropsRef.current = { 
+      threadId, 
+      initialMessagesLength: initialMessages.length 
+    };
+  }, [threadId, initialMessages.length]);
+
+  // Replace Convex mutation with Supabase mutation
+  const { mutate: cleanupDuplicates } = useSupabaseMutation(async (supabase, threadId: string) => {
+    // Find duplicates
+    const { data: summaries, error: fetchError } = await supabase
+      .from('message_summaries')
+      .select('*')
+      .eq('thread_id', threadId);
+      
+    if (fetchError) throw fetchError;
+    
+    // Find message IDs with multiple summaries
+    const messageIdCounts = summaries?.reduce((acc, summary) => {
+      acc[summary.message_id] = (acc[summary.message_id] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>) || {};
+    
+    // Get IDs of duplicate summaries to delete
+    const duplicateIds: string[] = [];
+    
+    Object.entries(messageIdCounts).forEach(([messageId, count]) => {
+      // Use type assertion for count
+      if ((count as number) > 1) {
+        // Keep the first summary, delete the rest
+        const summariesForMessage = summaries?.filter(s => s.message_id === messageId) || [];
+        const toDelete = summariesForMessage.slice(1);
+        duplicateIds.push(...toDelete.map(s => s.id));
+      }
+    });
+    
+    if (duplicateIds.length === 0) return { deleted: 0 };
+    
+    // Delete duplicates
+    const { error: deleteError } = await supabase
+      .from('message_summaries')
+      .delete()
+      .in('id', duplicateIds);
+      
+    if (deleteError) throw deleteError;
+    
+    return { deleted: duplicateIds.length };
+  });
+  
+  // Get messages and summaries for migration
+  const { messages: allMessages } = useMessages(threadId);
+  const { summaries: allSummaries } = useMessageSummaries(threadId);
+
+  const {
+    isNavigatorVisible,
+    handleToggleNavigator,
+    closeNavigator,
+    registerRef,
+    scrollToMessage,
+  } = useChatNavigator();
+
+  const { position } = useSidebar();
+  
+  // Create a ref to track initialization of navigator
+  const hasInitialized = useRef(false);
 
   // Get API key for the selected model
   const apiKey = getKey(modelConfig.provider);
-  
-  // Debug API configuration
-  useEffect(() => {
-    console.log('Model config:', {
-      model: selectedModel,
-      modelId: modelConfig.modelId,
-      provider: modelConfig.provider,
-      headerKey: modelConfig.headerKey,
-      hasApiKey: !!apiKey,
-    });
-  }, [selectedModel, modelConfig, apiKey]);
 
   const {
     messages,
@@ -143,7 +186,15 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       };
 
       try {
-        await createMessage(threadId, aiMessage, user.userId);
+        const messageId = await createMessage(threadId, aiMessage, user.userId);
+        
+        // Create a summary for the AI message
+        if (messageId && user) {
+          // Create a direct summary from the message content
+          const summary = createSummaryFromMessage(content);
+          await createMessageSummary(threadId, messageId, summary, user.userId);
+        }
+        
         // Scroll to bottom when message is finished
         scrollToBottom();
       } catch (error) {
@@ -155,24 +206,22 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   // Auto-scroll when messages change or when streaming
   useEffect(() => {
     if (messages.length > 0 || status === 'streaming') {
-      // Immediate scroll attempt
-      scrollToBottom();
+      // Use a single timeout for scrolling instead of multiple
+      const scrollTimeout = setTimeout(() => {
+        scrollToBottom();
+        
+        // Use the messagesEndRef to scroll if available
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
       
-      // Use the messagesEndRef to scroll if available
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
-      
-      // Delayed scroll attempt to ensure content has rendered
-      setTimeout(scrollToBottom, 100);
-      
-      // Another delayed attempt for slower rendering
-      setTimeout(scrollToBottom, 300);
+      return () => clearTimeout(scrollTimeout);
     }
-  }, [messages, status, scrollToBottom]);
+  }, [messages.length, status, scrollToBottom]); // Only depend on messages.length, not the entire messages array
 
   // Custom submit handler for direct API calls
-  const handleSubmit = async (userMessage: string) => {
+  const handleSubmit = useCallback(async (userMessage: string) => {
     if (!apiKey || isGenerating) return;
     
     setErrorMessage(null);
@@ -191,14 +240,19 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     
-    // Scroll to bottom after adding user message - multiple attempts for reliability
-    scrollToBottom();
-    setTimeout(scrollToBottom, 50);
-    setTimeout(scrollToBottom, 150);
+    // Use a single timeout for scrolling
+    setTimeout(scrollToBottom, 100);
     
     // Save user message to database
     try {
-      await createMessage(threadId, userMsg, user?.userId || '');
+      const messageId = await createMessage(threadId, userMsg, user?.userId || '');
+      
+      // Create a summary for the user message
+      if (messageId && user) {
+        // Create a direct summary from the message content
+        const summary = createSummaryFromMessage(userMessage);
+        await createMessageSummary(threadId, messageId, summary, user.userId);
+      }
     } catch (error) {
       console.error("Failed to save user message:", error);
     }
@@ -235,13 +289,17 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       setMessages([...updatedMessages, aiMsg]);
       
       // Save AI message to database
-      await createMessage(threadId, aiMsg, user?.userId || '');
+      const aiMessageId = await createMessage(threadId, aiMsg, user?.userId || '');
       
-      // Scroll to bottom after adding AI message - multiple attempts for reliability
-      scrollToBottom();
-      setTimeout(scrollToBottom, 50);
-      setTimeout(scrollToBottom, 150);
-      setTimeout(scrollToBottom, 300);
+      // Create a summary for the AI message
+      if (aiMessageId && user) {
+        // Create a direct summary from the message content
+        const summary = createSummaryFromMessage(responseText);
+        await createMessageSummary(threadId, aiMessageId, summary, user.userId);
+      }
+      
+      // Use a single timeout for scrolling
+      setTimeout(scrollToBottom, 100);
       
     } catch (error) {
       console.error("API Error:", error);
@@ -250,7 +308,7 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [apiKey, isGenerating, messages, threadId, user, createMessage, createMessageSummary, scrollToBottom, setMessages, modelConfig]);
 
   // Update document title based on first message
   useEffect(() => {
@@ -266,19 +324,74 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
         : firstUserMessage;
       
       // Update document title
-      document.title = `${newTitle} - Chat0`;
+      document.title = `${newTitle} - lax`;
       
       // Update thread title in database if this is the first user message
       if (userMessages.length === 1 && user) {
-        updateThread(threadId, newTitle).catch(err => {
+        updateThread(threadId, { title: newTitle }).catch((err: any) => {
           console.error('Failed to update thread title:', err);
         });
       }
     } else {
       // Default title when no messages
-      document.title = 'New Chat - Chat0';
+      document.title = 'New Chat - lax';
     }
   }, [messages, threadId, updateThread, user]);
+
+  // Clean up duplicate summaries and create missing summaries when component mounts
+  useEffect(() => {
+    // Only run this once when the component mounts
+    if (hasInitialized.current) return;
+    
+    const initializeNavigator = async () => {
+      if (!user || !threadId || !allMessages) return;
+      
+      try {
+        hasInitialized.current = true;
+        
+        // First clean up any duplicate summaries
+        await cleanupDuplicates(threadId);
+        
+        // Wait for the cleanup to complete and get updated summaries
+        const updatedSummaries = allSummaries;
+        if (!updatedSummaries) return;
+        
+        // Create a set of message IDs that already have summaries
+        const messagesWithSummaries = new Set(updatedSummaries.map((summary: any) => summary.messageId));
+        
+        // Find messages without summaries
+        const messagesWithoutSummaries = allMessages.filter((message: any) => 
+          !messagesWithSummaries.has(message._id)
+        );
+        
+        // Limit the number of summaries we create at once to avoid overloading
+        const MAX_SUMMARIES_TO_CREATE = 5;
+        const limitedMessages = messagesWithoutSummaries.slice(0, MAX_SUMMARIES_TO_CREATE);
+        
+        // Create summaries for messages that don't have them
+        for (const message of limitedMessages) {
+          if (!message || !message.content) continue;
+          
+          const summary = createSummaryFromMessage(message.content);
+          try {
+            await createMessageSummary(threadId, message._id, summary, user.userId);
+          } catch (error) {
+            console.error(`Failed to create summary for message:`, error);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize navigator:", error);
+      }
+    };
+    
+    // Wrap in setTimeout to avoid immediate execution during render
+    const timer = setTimeout(() => {
+      initializeNavigator();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId, user, allMessages?.length]); // Simplified dependencies to avoid excessive re-renders
 
   if (!user) return null;
 
@@ -311,57 +424,14 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   const chatStatus = isGenerating ? 'streaming' : 'ready';
   
   // Determine button position based on sidebar position
-  const navigatorButtonPosition = position === 'right' ? 'left-16' : 'right-16';
-  
-  console.log('Chat rendering:', { position, navigatorButtonPosition });
-  
-  // Use useEffect to log when the component mounts
-  useEffect(() => {
-    console.log('Chat component mounted');
-    
-    // Log the navigator button element to check if it's in the DOM
-    setTimeout(() => {
-      const navButton = document.querySelector('button[aria-label="Show message navigator"]') || 
-                        document.querySelector('button[aria-label="Hide message navigator"]');
-      console.log('Navigator button found in DOM:', !!navButton);
-      
-      if (navButton) {
-        const rect = navButton.getBoundingClientRect();
-        console.log('Navigator button position:', { 
-          top: rect.top, 
-          right: rect.right,
-          bottom: rect.bottom,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height
-        });
-      }
-      
-      // Check the main container's position and dimensions
-      const mainContainer = document.querySelector('.relative.w-full.flex.flex-col.items-center');
-      if (mainContainer) {
-        const rect = mainContainer.getBoundingClientRect();
-        console.log('Main container dimensions:', { 
-          top: rect.top, 
-          right: rect.right,
-          bottom: rect.bottom,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height
-        });
-      }
-    }, 500);
-    
-    return () => {
-      console.log('Chat component unmounted');
-    };
-  }, []);
+  const navigatorButtonPosition = useMemo(() => 
+    position === 'right' ? 'left-16' : 'right-16'
+  , [position]);
 
   return (
     <div className="relative w-full h-full flex flex-col">
       <div className="flex-1 overflow-auto pb-48" id="chat-scroll-container">
         <div className="flex flex-col items-center">
-          <SidebarTrigger />
           <main
             className={`flex flex-col w-full max-w-3xl pt-10 mx-auto transition-all duration-300 ease-in-out`}
           >
@@ -431,4 +501,6 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       />
     </div>
   );
-}
+});
+
+export default Chat;

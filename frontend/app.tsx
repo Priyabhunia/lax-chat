@@ -1,5 +1,5 @@
-import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { ConvexAuthProvider } from "./providers/ConvexAuthProvider";
+import { SupabaseProvider } from "./providers/SupabaseProvider";
+import { SupabaseAuthProvider } from "./providers/SupabaseAuthProvider";
 import { AuthPage } from "./pages/auth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import ChatLayout from "./ChatLayout";
@@ -7,14 +7,11 @@ import Home from './routes/Home';
 import Index from './routes/Index';
 import Thread from './routes/Thread';
 import Settings from './routes/Settings';
+// import Diagnostics from './routes/diagnostics';
+import TestCorsPage from './routes/test-cors';
+// import Bypass from './routes/Bypass';
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-
-// Initialize Convex client
-// This ensures we have a valid URL even if environment variables aren't loaded
-// const convexUrl = import.meta.env.VITE_CONVEX_URL || "https://silent-snail-247.convex.cloud";
-const convexUrl = (import.meta as any).env.VITE_CONVEX_URL || "https://silent-snail-247.convex.cloud";
-
-const convex = new ConvexReactClient(convexUrl);
+import { ThemeProvider } from "./components/ui/ThemeProvider";
 
 // Create router with future flags
 const router = createBrowserRouter(
@@ -23,6 +20,15 @@ const router = createBrowserRouter(
       path: "/auth",
       element: <AuthPage />
     },
+    // Diagnostics route removed
+    {
+      path: "/cors-test",
+      element: <TestCorsPage />
+    },
+    // {
+    //   path: "/bypass",
+    //   element: <Bypass />
+    // },
     {
       path: "/",
       element: (
@@ -48,11 +54,13 @@ const router = createBrowserRouter(
 
 function App() {
   return (
-    <ConvexProvider client={convex}>
-      <ConvexAuthProvider>
-        <RouterProvider router={router} />
-      </ConvexAuthProvider>
-    </ConvexProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <SupabaseProvider>
+        <SupabaseAuthProvider>
+          <RouterProvider router={router} />
+        </SupabaseAuthProvider>
+      </SupabaseProvider>
+    </ThemeProvider>
   );
 }
 

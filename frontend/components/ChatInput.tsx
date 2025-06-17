@@ -1,29 +1,31 @@
 import { ChevronDown, Check, ArrowUpIcon } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Textarea } from '@/frontend/components/ui/textarea';
-import { cn } from '@/lib/utils';
-import { Button } from '@/frontend/components/ui/button';
+import { Textarea } from './ui/textarea';
+import { cn } from '../../lib/utils';
+import { Button } from './ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/frontend/components/ui/dropdown-menu';
-import useAutoResizeTextarea from '@/hooks/useAutoResizeTextArea';
+  DropdownMenuSeparator,
+} from './ui/dropdown-menu';
+import useAutoResizeTextarea from '../../hooks/useAutoResizeTextArea';
 import { UseChatHelpers, useCompletion } from '@ai-sdk/react';
 import { useParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
-import { useCreateMessage, useCreateThread } from '@/frontend/hooks/useConvexData';
-import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
-import { useModelStore } from '@/frontend/stores/ModelStore';
-import { AI_MODELS, AIModel, getModelConfig } from '@/lib/models';
-import KeyPrompt from '@/frontend/components/KeyPrompt';
+import { useCreateMessage, useCreateThread } from '../hooks/useSupabaseData';
+import { useAPIKeyStore } from '../stores/APIKeyStore';
+import { useModelStore } from '../stores/ModelStore';
+import { AI_MODELS, AIModel, getModelConfig } from '../../lib/models';
+import KeyPrompt from './KeyPrompt';
 import { UIMessage } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { StopIcon } from './ui/icons';
 import { toast } from 'sonner';
 import { useMessageSummary } from '../hooks/useMessageSummary';
 import { useSidebar } from './ui/sidebar';
+import { useAuth } from '../providers/SupabaseAuthProvider';
 
 // Declare global types for our submission tracking
 declare global {
@@ -91,25 +93,7 @@ function PureChatInput({
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // Add logging to track sidebar state and input positioning
-  useEffect(() => {
-    console.log("ChatInput - Sidebar state:", { 
-      isOpen: sidebarIsOpen, 
-      position: sidebarPosition 
-    });
-    
-    // Log the current dimensions of the chat input container
-    const inputContainer = document.querySelector('.fixed.bottom-0.left-0.right-0');
-    if (inputContainer) {
-      const rect = inputContainer.getBoundingClientRect();
-      console.log("ChatInput - Container dimensions:", { 
-        width: rect.width, 
-        left: rect.left, 
-        right: rect.right 
-      });
-    }
-  }, [sidebarIsOpen, sidebarPosition]);
-
+  // Keep track of sidebar state for proper positioning
   const isDisabled = useMemo(
     () => !input.trim() || status !== 'ready' || isSubmittingRef.current,
     [input, status]
@@ -138,11 +122,9 @@ function PureChatInput({
         // Create a new thread if we're not in one
         const newThreadId = await createThread("New Chat", userId);
         navigate(`/chat/${newThreadId || threadId}`);
-        complete(currentInput.trim(), {
-          body: { threadId: newThreadId || threadId, messageId, isTitle: true },
-        });
+        complete(userMessage.content.toString());
       } else {
-        complete(currentInput.trim(), { body: { messageId, threadId } });
+        complete(userMessage.content.toString());
       }
 
       // Save message to database

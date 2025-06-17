@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { SidebarProvider, useSidebar } from './components/ui/sidebar';
 import { Button } from './components/ui/button';
 import { Square } from 'lucide-react';
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 
 function MainContent() {
   const { isOpen, toggleSidebar, position } = useSidebar();
@@ -14,20 +14,6 @@ function MainContent() {
     return position === 'left' ? 'left-4' : 'right-4';
   }, [position]);
   
-  // Add logging to track main content dimensions when sidebar state changes
-  useEffect(() => {
-    console.log("MainContent - Sidebar state:", { isOpen, position });
-    
-    if (mainContentRef.current) {
-      const rect = mainContentRef.current.getBoundingClientRect();
-      console.log("MainContent - Dimensions:", { 
-        width: rect.width, 
-        left: rect.left, 
-        right: rect.right 
-      });
-    }
-  }, [isOpen, position]);
-  
   return (
     <main ref={mainContentRef} className="flex-1 relative overflow-hidden transition-all duration-300 h-screen flex flex-col">
       {/* Persistent sidebar toggle button - only visible when sidebar is closed */}
@@ -35,7 +21,7 @@ function MainContent() {
         <Button
           variant="ghost"
           size="icon"
-          className={`fixed top-4 z-50 ${buttonPosition}`}
+          className={`fixed top-4 z-50 ${buttonPosition} text-foreground hover:bg-accent hover:text-accent-foreground`}
           onClick={toggleSidebar}
           aria-label="Open Sidebar"
         >
@@ -51,8 +37,6 @@ function MainContent() {
 
 function LayoutContent() {
   const { position } = useSidebar();
-  
-  console.log("LayoutContent rendering, position:", position);
   
   // Use React.useMemo to prevent unnecessary re-renders
   const layoutClassName = React.useMemo(() => {

@@ -1,20 +1,36 @@
 import { useState } from "react";
-import { useAuth } from "../../providers/ConvexAuthProvider";
+import { useAuth } from "../../providers/SupabaseAuthProvider";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login, isLoading } = useAuth();
+  const [message, setMessage] = useState("");
+  const { login, isLoading, refreshSession } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
+    
+    console.log("[DEBUG] Login attempt with email:", email);
     
     try {
       await login(email, password);
-    } catch (err) {
-      setError("Invalid email or password");
+      console.log("[DEBUG] Login function completed successfully");
+      setMessage("Login successful! Please wait...");
+      
+      // Refresh session to ensure it's properly established
+      try {
+        console.log("[DEBUG] Refreshing session after login");
+        await refreshSession();
+      } catch (refreshError) {
+        console.error("[DEBUG] Error refreshing session:", refreshError);
+      }
+      
+    } catch (err: any) {
+      console.error("[DEBUG] Login error:", err);
+      setError(err.message || "Invalid email or password");
     }
   };
 
@@ -25,6 +41,12 @@ export function LoginForm() {
       {error && (
         <div className="mb-4 p-2 bg-red-100 text-red-700 rounded">
           {error}
+        </div>
+      )}
+      
+      {message && (
+        <div className="mb-4 p-2 bg-green-100 text-green-700 rounded">
+          {message}
         </div>
       )}
       

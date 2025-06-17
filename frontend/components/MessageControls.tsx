@@ -8,8 +8,8 @@ import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 import { toast } from 'sonner';
 import { useModelStore } from '@/frontend/stores/ModelStore';
 import { v4 as uuidv4 } from 'uuid';
-import { useCreateMessage } from '../hooks/useConvexData';
-import { useAuth } from '../providers/ConvexAuthProvider';
+import { useCreateMessage } from '../hooks/useSupabaseData';
+import { useAuth } from '../providers/SupabaseAuthProvider';
 import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHelpers';
 
 interface MessageControlsProps {
@@ -50,20 +50,17 @@ export default function MessageControls({
     
     try {
       setIsRegenerating(true);
-      console.log('Regenerating message:', message.id);
       
       // Stop any ongoing requests
       stop();
       
       // Update UI to remove messages after this one
       if (message.role === 'user') {
-        console.log('Keeping user message and removing subsequent messages');
         setMessages((messages) => {
           const index = messages.findIndex((m) => m.id === message.id);
           
           if (index !== -1) {
             const updatedMessages = [...messages.slice(0, index + 1)];
-            console.log('Updated messages:', updatedMessages);
             return updatedMessages;
           }
           
@@ -125,8 +122,6 @@ export default function MessageControls({
           toast.error(`Error: ${error instanceof Error ? error.message : 'Failed to get response'}`);
         }
       } else {
-        console.log('Removing assistant message and finding previous user message');
-        
         // Find the last user message before this assistant message
         let lastUserMessage: UIMessage | null = null;
         
@@ -147,13 +142,11 @@ export default function MessageControls({
             // If we found a user message, keep everything up to and including it
             if (lastUserMessageIndex !== -1) {
               const updatedMessages = [...messages.slice(0, lastUserMessageIndex + 1)];
-              console.log('Updated messages:', updatedMessages);
               return updatedMessages;
             }
             
             // Otherwise just remove this message
             const updatedMessages = [...messages.slice(0, index)];
-            console.log('Updated messages (no user message found):', updatedMessages);
             return updatedMessages;
           }
           
@@ -218,8 +211,6 @@ export default function MessageControls({
           }
         }
       }
-      
-      console.log('Regeneration completed');
     } catch (error) {
       console.error('Error during regeneration:', error);
       toast.error('Failed to regenerate response');

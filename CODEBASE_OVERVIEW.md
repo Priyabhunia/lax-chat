@@ -1,4 +1,4 @@
-# CODEBASE OVERVIEW
+# Codebase Overview for lax
 
 ## Table of Contents
 
@@ -17,7 +17,13 @@
 
 ## Project Summary
 
-**Chat0** is a privacy-first, open-source AI chat application supporting multiple AI providers (OpenAI, Google Gemini, DeepSeek, etc.). All data is stored locally in the browser, and users bring their own API keys.
+**lax** is a privacy-first, open-source AI chat application supporting multiple AI providers (OpenAI, Google Gemini, DeepSeek, etc.). All data is stored locally in the browser, and users bring their own API keys.
+
+---
+
+## Repository
+
+https://github.com/Priyabhunia/me
 
 ---
 

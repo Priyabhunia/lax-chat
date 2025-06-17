@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../../providers/ConvexAuthProvider";
+import { useAuth } from "../../providers/SupabaseAuthProvider";
 
 interface ProtectedRouteProps {
   children: ReactNode;

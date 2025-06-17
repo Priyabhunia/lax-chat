@@ -1,6 +1,10 @@
 # Convex Authentication and Backend Setup
 
-This document provides instructions for setting up Convex authentication and backend for the Chat0 application.
+This document provides instructions for setting up Convex authentication and backend for the lax application.
+
+## Repository
+
+https://github.com/Priyabhunia/me
 
 ## Setup Steps
 

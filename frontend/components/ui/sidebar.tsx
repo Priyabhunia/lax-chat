@@ -147,22 +147,6 @@ interface SidebarProps {
 export function Sidebar({ className, children }: SidebarProps) {
   const { isOpen, setIsOpen, isMobile, position } = useSidebar();
   const sidebarRef = React.useRef<HTMLDivElement>(null);
-  
-  console.log("Sidebar rendering, position:", position);
-
-  // Add effect to log sidebar width changes
-  React.useEffect(() => {
-    console.log("Sidebar - State changed:", { isOpen, position });
-    
-    if (sidebarRef.current) {
-      const rect = sidebarRef.current.getBoundingClientRect();
-      console.log("Sidebar - Dimensions:", { 
-        width: rect.width, 
-        left: rect.left, 
-        right: rect.right 
-      });
-    }
-  }, [isOpen, position]);
 
   if (isMobile) {
     return (
@@ -178,12 +162,15 @@ export function Sidebar({ className, children }: SidebarProps) {
     <div
       ref={sidebarRef}
       className={cn(
-        'h-screen bg-background flex-shrink-0 transition-[width] duration-300 overflow-hidden',
+        'h-screen flex-shrink-0 transition-[width] duration-300 overflow-hidden',
         position === 'left' ? 'border-r' : 'border-l',
         position === 'left' ? 'order-first' : 'order-last',
         className
       )}
-      style={{ width: isOpen ? '280px' : '0px' }}
+      style={{ 
+        width: isOpen ? '280px' : '0px',
+        backgroundColor: 'hsl(var(--sidebar) / 1)'
+      }}
     >
       <div className="flex h-full flex-col order-none">{children}</div>
     </div>
@@ -214,13 +201,20 @@ export function SidebarTrigger({ className, onClick, ...props }: React.Component
 
   return (
     <button
-      className={cn('p-2', className)}
+      className={cn(
+        'p-2 rounded-md bg-background hover:bg-muted text-foreground transition-all',
+        'fixed top-4 left-4 z-40',
+        className
+      )}
       onClick={(e) => {
         toggleSidebar();
         onClick?.(e);
       }}
+      aria-label="Toggle Sidebar"
       {...props}
-    />
+    >
+      <PanelLeftIcon className="h-5 w-5" />
+    </button>
   );
 }
 

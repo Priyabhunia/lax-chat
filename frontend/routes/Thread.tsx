@@ -1,44 +1,118 @@
 import Chat from '../components/Chat';
-import { useParams } from 'react-router-dom';
-import { useMessages } from '../hooks/useConvexData';
-import { useAuth } from '../providers/ConvexAuthProvider';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useMessages, useThread } from '../hooks/useSupabaseData';
+import { useAuth } from '../providers/SupabaseAuthProvider';
 import { UIMessage } from 'ai';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 
 export default function Thread() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { messages, isLoading: messagesLoading, error: messagesError } = useMessages(id || '');
+  const { thread, isLoading: threadLoading, error: threadError } = useThread(id || '');
+  const navigate = useNavigate();
+  const [switchingThread, setSwitchingThread] = useState(false);
+  const [currentThreadId, setCurrentThreadId] = useState(id);
   
-  if (!id) throw new Error('Thread ID is required');
-  if (!user) return null;
-
-  // Convert ID from string to Convex ID (this will be handled by the hook)
-  const messages = useMessages(id);
-
-  const convertToUIMessages = (messages?: any[]): UIMessage[] => {
-    if (!messages) return [];
+  // Show immediate loading state when thread ID changes
+  useEffect(() => {
+    if (id !== currentThreadId) {
+      setSwitchingThread(true);
+      setCurrentThreadId(id);
+    }
+  }, [id, currentThreadId]);
+  
+  // Clear switching state once loading completes
+  useEffect(() => {
+    if (!messagesLoading && !threadLoading && switchingThread) {
+      setSwitchingThread(false);
+    }
+  }, [messagesLoading, threadLoading, switchingThread]);
+  
+  // Memoize the navigation callback to prevent re-renders
+  const navigateToHome = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+  
+  // Navigation effect - only run once when loading is complete
+  useEffect(() => {
+    // Skip if still loading
+    if (threadLoading || messagesLoading) {
+      return;
+    }
     
-    return messages.map((message) => {
-      // Ensure role is one of the allowed types
-      let role: 'user' | 'assistant' | 'system' = 'user';
-      if (message.role === 'assistant' || message.role === 'system') {
-        role = message.role;
-      }
+    // If thread doesn't exist after loading completes, redirect to home
+    if (!threadLoading && !thread && id) {
+      console.error("Thread not found, navigating home:", id);
+      // Use a timeout to avoid immediate redirect which could cause loops
+      const redirectTimer = setTimeout(navigateToHome, 100);
       
-      return {
-        id: message._id.toString(),
-        role,
-        content: message.content || '',
-        createdAt: new Date(message.createdAt),
-        parts: [{ type: "text" as const, text: message.content }]
-      };
-    });
-  };
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [id, threadLoading, messagesLoading, thread, navigateToHome]);
 
-  const uiMessages = convertToUIMessages(messages);
+  // Memoize UI messages to prevent unnecessary re-renders
+  const uiMessages: UIMessage[] = useMemo(() => {
+    return messages.map((message: any) => ({
+    id: message.id,
+    role: message.role as 'user' | 'assistant',
+    content: message.content,
+    createdAt: new Date(message.created_at),
+    parts: [{ type: 'text', text: message.content }]
+  }));
+  }, [messages]);
+
+  if (!id) {
+    return <div className="flex items-center justify-center h-full">Thread not found</div>;
+  }
+
+  // Show immediate loading state when switching threads
+  if (switchingThread) {
+    return <div className="flex items-center justify-center h-full">
+      <div className="animate-pulse">Switching thread...</div>
+    </div>;
+  }
+
+  if (messagesError || threadError) {
+    const error = messagesError || threadError;
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="text-red-500 mb-4">Error loading thread</div>
+        <div className="text-sm mb-4 p-2 bg-red-50 border border-red-200 rounded max-w-md">
+          {error?.message || "Unknown error"}
+        </div>
+        <button 
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={navigateToHome}
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
+
+  if (messagesLoading || threadLoading) {
+    return <div className="flex items-center justify-center h-full">
+      <div className="animate-pulse">Loading thread...</div>
+    </div>;
+  }
+  
+  if (!thread) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="text-red-500 mb-4">Thread not found</div>
+        <button 
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={navigateToHome}
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
 
   return (
     <Chat
-      key={id}
       threadId={id}
       initialMessages={uiMessages}
     />

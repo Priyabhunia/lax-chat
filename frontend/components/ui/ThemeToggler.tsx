@@ -7,46 +7,41 @@ import { useSidebar } from './sidebar';
 
 import { Button } from '@/frontend/components/ui/button';
 
-export default function ThemeToggler() {
+// Memoize the entire component to prevent unnecessary re-renders
+export default React.memo(function ThemeToggler() {
   const { setTheme, theme } = useTheme();
   const { position } = useSidebar();
   
-  // Determine button position based on sidebar position
-  const buttonPosition = position === 'right' ? 'left-4' : 'right-4';
+  // Memoize button position to prevent re-renders
+  const buttonPosition = React.useMemo(() => 
+    position === 'right' ? 'left-4' : 'right-4'
+  , [position]);
   
-  console.log('ThemeToggler rendering:', { position, buttonPosition, theme });
-
-  // Use useEffect to log when the component mounts
-  React.useEffect(() => {
-    console.log('ThemeToggler mounted');
+  // Handle theme toggle
+  const toggleTheme = React.useCallback(() => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
     
-    // Log the button element to check if it's in the DOM
-    setTimeout(() => {
-      const button = document.querySelector('button[aria-label="Toggle theme"]');
-      console.log('ThemeToggler button found in DOM:', !!button);
-      if (button) {
-        const rect = button.getBoundingClientRect();
-        console.log('ThemeToggler button position:', { 
-          top: rect.top, 
-          right: rect.right,
-          bottom: rect.bottom,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height
-        });
-      }
-    }, 500);
+    // Manually update the HTML class for immediate visual feedback
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     
-    return () => {
-      console.log('ThemeToggler unmounted');
-    };
-  }, []);
+    // Store in localStorage (next-themes should do this, but we'll ensure it happens)
+    try {
+      localStorage.setItem('theme', newTheme);
+    } catch (e) {
+      console.error('Error saving theme to localStorage:', e);
+    }
+  }, [theme, setTheme]);
 
   return (
     <Button
       variant="outline"
       size="icon"
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      onClick={toggleTheme}
       className={`fixed top-4 ${buttonPosition} z-50`}
       aria-label="Toggle theme"
     >
@@ -55,4 +50,4 @@ export default function ThemeToggler() {
       <span className="sr-only">Toggle theme</span>
     </Button>
   );
-}
+});

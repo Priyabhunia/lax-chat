@@ -65,7 +65,11 @@ function PureMessage({
               />
             </div>
           ) : (
-            <div key={key} className="group flex flex-col gap-2 w-full">
+            <div 
+              key={key} 
+              className="group flex flex-col gap-2 w-full"
+              ref={(el) => registerRef(message.id, el)}
+            >
               <MarkdownRenderer content={part.text} id={message.id} />
               {!isStreaming && (
                 <MessageControls
