@@ -1,7 +1,7 @@
+
 # lax
 
-Blazingly-Fast, Open-source, and Free AI Chat App with Convex backend.
-
+this is a chat app for the opensource community
 ## Features
 
 - Open Source
@@ -24,13 +24,18 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 💻 Running Locally
 
+
 To run lax locally, you'll need to follow these steps:
+
+
 
 ### 1. Clone the repository:
 
 ```bash
+
 git clone https://github.com/Priyabhunia/me.git
 cd lax
+
 ```
 
 ### 2. Install dependencies:
@@ -82,7 +87,10 @@ Navigate to [http://localhost:3000](http://localhost:3000) to see the applicatio
 
 ## 🔐 Authentication Setup
 
+
 lax uses Convex for user authentication:
+
+
 
 1. Register a new account on the app's login page
 2. Your credentials are securely stored in the Convex database
@@ -116,6 +124,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch
 5. Open a Pull Request
 
+
 Thank you snebo
 
 ## About
@@ -125,3 +134,5 @@ this is a  cute chat app for open source community
 ## Repository
 
 https://github.com/Priyabhunia/me
+
+
