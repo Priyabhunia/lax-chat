@@ -4,7 +4,22 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/globe.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chat0</title>
+    <title>lax.ai</title>
+    <script>
+      // On page load, check for saved theme preference
+      (function() {
+        try {
+          const theme = localStorage.getItem('theme');
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          console.error('Error applying theme:', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

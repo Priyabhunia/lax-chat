@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/globe.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>lax.ai</title>
+    <script>
+      // On page load, check for saved theme preference
+      (function() {
+        try {
+          const theme = localStorage.getItem('theme');
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          console.error('Error applying theme:', e);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-DYKinVL2.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DhZcPG-y.css">
+  </head>
+  <body>
+    <div id="root"></div>
+
+  </body>
+</html> 

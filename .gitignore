@@ -16,7 +16,7 @@
 # next.js
 /.next/
 /out/
-
+.env 
 # production
 /build
 
@@ -31,14 +31,22 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+# .env.local
+# .env*
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Environment variables
 .env
+.env.local
+.env.development
+.env.production
+
+
+VITE_CONVEX_URL="https://primepro640-gmail-coms-cloud-dev.convex.cloud"
 .env.local

@@ -1,8 +1,8 @@
 import { useCompletion } from '@ai-sdk/react';
 import { useAPIKeyStore } from '@/frontend/stores/APIKeyStore';
 import { toast } from 'sonner';
-import { useCreateMessageSummary, useUpdateThread } from './useConvexData';
-import { useAuth } from '../providers/ConvexAuthProvider';
+import { useCreateMessageSummary, useUpdateThread } from './useSupabaseData';
+import { useAuth } from '../providers/SupabaseAuthProvider';
 
 interface MessageSummaryPayload {
   title: string;
@@ -32,7 +32,7 @@ export const useMessageSummary = () => {
           const { title, isTitle, messageId, threadId } = payload;
 
           if (isTitle) {
-            await updateThread(threadId, title);
+            await updateThread(threadId, { title });
             await createMessageSummary(threadId, messageId, title, user.userId);
           } else {
             await createMessageSummary(threadId, messageId, title, user.userId);

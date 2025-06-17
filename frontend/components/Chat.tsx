@@ -1,155 +1,51 @@
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from '../providers/SupabaseAuthProvider';
+import { useCreateMessage, useUpdateThread, useCreateMessageSummary, useMessages, useMessageSummaries } from '../hooks/useSupabaseData';
+import { UIMessage } from 'ai';
+import { useAPIKeyStore } from '../stores/APIKeyStore';
+import { useModelStore } from '../stores/ModelStore';
+import { Button } from './ui/button';
 import Messages from './Messages';
 import ChatInput from './ChatInput';
 import ChatNavigator from './ChatNavigator';
-import { UIMessage } from 'ai';
-import { v4 as uuidv4 } from 'uuid';
-import { useCreateMessage, useUpdateThread } from '../hooks/useConvexData';
-import { useAPIKeyStore } from '../stores/APIKeyStore';
-import { useModelStore } from '../stores/ModelStore';
-import ThemeToggler from './ui/ThemeToggler';
-import { Button } from './ui/button';
 import { MessageSquareMore } from 'lucide-react';
-import { useChatNavigator } from '../hooks/useChatNavigator';
-import { useAuth } from '../providers/ConvexAuthProvider';
-import { SidebarTrigger } from './ui/sidebar';
-import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import ThemeToggler from './ui/ThemeToggler';
+import { SidebarTrigger, useSidebar } from './ui/sidebar';
+import { useChatNavigator } from '../hooks/useChatNavigator';
+import { callGeminiAPI, callOpenAIAPI, callOpenRouterAPI } from '../utils/apiHelpers';
+import { useMessageSummary } from '../hooks/useMessageSummary';
+import { useSupabaseMutation } from '../hooks/useSupabaseQuery';
+import { useSupabase } from '../providers/SupabaseProvider';
+// We don't need Convex imports since we're migrating to Supabase
+// The necessary Supabase functionality is already available through the useAuth hook
 
 interface ChatProps {
   threadId: string;
   initialMessages: UIMessage[];
 }
 
-// Helper function to call Google Gemini API directly
-const callGeminiAPI = async (messages: UIMessage[], apiKey: string, modelId: string) => {
-  try {
-    console.log("Calling Gemini API with model:", modelId);
-    
-    // Format messages for Gemini
-    const formattedMessages = messages.map(msg => ({
-      role: msg.role,
-      parts: [{ text: msg.content }]
-    }));
-
-    // Make sure to use the correct API endpoint format based on the model ID
-    const endpoint = `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent?key=${apiKey}`;
-    console.log("Using Gemini endpoint:", endpoint);
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: formattedMessages,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Gemini API error response:", errorData);
-      throw new Error(`API error: ${response.status} ${response.statusText} - ${errorData}`);
-    }
-
-    const data = await response.json();
-    
-    // Check if candidates array exists and has content
-    if (!data.candidates || data.candidates.length === 0) {
-      console.error("No candidates in response:", data);
-      throw new Error("No response generated from the model");
-    }
-    
-    if (!data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
-      console.error("No content parts in response:", data.candidates[0]);
-      throw new Error("Invalid response format from the model");
-    }
-    
-    return data.candidates[0].content.parts[0].text;
-  } catch (error) {
-    console.error("Error in callGeminiAPI:", error);
-    throw error;
-  }
-};
-
-// Helper function to get Gemini API model ID
-const getGeminiModelId = (modelName: string): string => {
-  // For 2.5 Pro and Flash, the model IDs are in the model config
-  if (modelName.includes('2.5')) {
-    return modelName; // Return as is, it's already the correct format
+// Helper function to create a summary from message content
+const createSummaryFromMessage = (content: string): string => {
+  // Truncate to first 50 characters or less
+  const maxLength = 50;
+  let summary = content.trim();
+  
+  // Remove markdown formatting
+  summary = summary.replace(/[#*_~`]/g, '');
+  
+  // Truncate if needed and add ellipsis
+  if (summary.length > maxLength) {
+    const truncated = summary.substring(0, maxLength).trim();
+    return truncated + '...';
   }
   
-  // For Gemini 2.0 Flash (fallback)
-  return "gemini-2.0-flash";
+  return summary;
 };
 
-// Helper function to call OpenAI API
-const callOpenAIAPI = async (messages: UIMessage[], apiKey: string, modelId: string) => {
-  const formattedMessages = messages.map(msg => ({
-    role: msg.role === 'user' ? 'user' : 'assistant',
-    content: msg.content
-  }));
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: formattedMessages,
-      temperature: 0.7,
-      max_tokens: 2048,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-};
-
-// Helper function to call OpenRouter API
-const callOpenRouterAPI = async (messages: UIMessage[], apiKey: string, modelId: string) => {
-  const formattedMessages = messages.map(msg => ({
-    role: msg.role === 'user' ? 'user' : 'assistant',
-    content: msg.content
-  }));
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'Chat0'
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: formattedMessages,
-      temperature: 0.7,
-      max_tokens: 2048,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-};
-
-export default function Chat({ threadId, initialMessages }: ChatProps) {
+const Chat = memo(function Chat({ threadId, initialMessages }: ChatProps) {
   const { getKey } = useAPIKeyStore();
   const selectedModel = useModelStore((state) => state.selectedModel);
   const modelConfig = useModelStore((state) => state.getModelConfig());
@@ -158,6 +54,93 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
   const updateThread = useUpdateThread();
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { complete: createSummary } = useMessageSummary();
+  const createMessageSummary = useCreateMessageSummary();
+  const supabase = useSupabase();
+  const prevPropsRef = useRef({ threadId, initialMessagesLength: initialMessages.length });
+  
+  // Function to scroll to bottom of messages
+  const scrollToBottom = useCallback(() => {
+    // Try multiple possible scroll containers to ensure we find the right one
+    const scrollContainers = [
+      document.getElementById('chat-scroll-container'),
+      document.querySelector('.flex-1.overflow-auto'),
+      document.querySelector('main'),
+      document.querySelector('.overflow-auto')
+    ];
+    
+    // Try scrolling the container
+    for (const container of scrollContainers) {
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+        break;
+      }
+    }
+    
+    // Also try scrolling to the messages-end element
+    const messagesEnd = document.getElementById('messages-end');
+    if (messagesEnd) {
+      messagesEnd.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+  
+  // Update refs for next render comparison
+  useEffect(() => {
+    prevPropsRef.current = { 
+      threadId, 
+      initialMessagesLength: initialMessages.length 
+    };
+  }, [threadId, initialMessages.length]);
+
+  // Replace Convex mutation with Supabase mutation
+  const { mutate: cleanupDuplicates } = useSupabaseMutation(async (supabase, threadId: string) => {
+    // Find duplicates
+    const { data: summaries, error: fetchError } = await supabase
+      .from('message_summaries')
+      .select('*')
+      .eq('thread_id', threadId);
+      
+    if (fetchError) throw fetchError;
+    
+    // Find message IDs with multiple summaries
+    const messageIdCounts = summaries?.reduce((acc, summary) => {
+      acc[summary.message_id] = (acc[summary.message_id] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>) || {};
+    
+    // Get IDs of duplicate summaries to delete
+    const duplicateIds: string[] = [];
+    
+    Object.entries(messageIdCounts).forEach(([messageId, count]) => {
+      // Use type assertion for count
+      if ((count as number) > 1) {
+        // Keep the first summary, delete the rest
+        const summariesForMessage = summaries?.filter(s => s.message_id === messageId) || [];
+        const toDelete = summariesForMessage.slice(1);
+        duplicateIds.push(...toDelete.map(s => s.id));
+      }
+    });
+    
+    if (duplicateIds.length === 0) return { deleted: 0 };
+    
+    // Delete duplicates
+    const { error: deleteError } = await supabase
+      .from('message_summaries')
+      .delete()
+      .in('id', duplicateIds);
+      
+    if (deleteError) throw deleteError;
+    
+    return { deleted: duplicateIds.length };
+  });
+  
+  // Get messages and summaries for migration
+  const { messages: allMessages } = useMessages(threadId);
+  const { summaries: allSummaries } = useMessageSummaries(threadId);
 
   const {
     isNavigatorVisible,
@@ -167,19 +150,13 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     scrollToMessage,
   } = useChatNavigator();
 
+  const { position } = useSidebar();
+  
+  // Create a ref to track initialization of navigator
+  const hasInitialized = useRef(false);
+
   // Get API key for the selected model
   const apiKey = getKey(modelConfig.provider);
-  
-  // Debug API configuration
-  useEffect(() => {
-    console.log('Model config:', {
-      model: selectedModel,
-      modelId: modelConfig.modelId,
-      provider: modelConfig.provider,
-      headerKey: modelConfig.headerKey,
-      hasApiKey: !!apiKey,
-    });
-  }, [selectedModel, modelConfig, apiKey]);
 
   const {
     messages,
@@ -209,15 +186,42 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       };
 
       try {
-        await createMessage(threadId, aiMessage, user.userId);
+        const messageId = await createMessage(threadId, aiMessage, user.userId);
+        
+        // Create a summary for the AI message
+        if (messageId && user) {
+          // Create a direct summary from the message content
+          const summary = createSummaryFromMessage(content);
+          await createMessageSummary(threadId, messageId, summary, user.userId);
+        }
+        
+        // Scroll to bottom when message is finished
+        scrollToBottom();
       } catch (error) {
         console.error(error);
       }
     }
   });
 
+  // Auto-scroll when messages change or when streaming
+  useEffect(() => {
+    if (messages.length > 0 || status === 'streaming') {
+      // Use a single timeout for scrolling instead of multiple
+      const scrollTimeout = setTimeout(() => {
+        scrollToBottom();
+        
+        // Use the messagesEndRef to scroll if available
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+      
+      return () => clearTimeout(scrollTimeout);
+    }
+  }, [messages.length, status, scrollToBottom]); // Only depend on messages.length, not the entire messages array
+
   // Custom submit handler for direct API calls
-  const handleSubmit = async (userMessage: string) => {
+  const handleSubmit = useCallback(async (userMessage: string) => {
     if (!apiKey || isGenerating) return;
     
     setErrorMessage(null);
@@ -236,9 +240,19 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     
+    // Use a single timeout for scrolling
+    setTimeout(scrollToBottom, 100);
+    
     // Save user message to database
     try {
-      await createMessage(threadId, userMsg, user?.userId || '');
+      const messageId = await createMessage(threadId, userMsg, user?.userId || '');
+      
+      // Create a summary for the user message
+      if (messageId && user) {
+        // Create a direct summary from the message content
+        const summary = createSummaryFromMessage(userMessage);
+        await createMessageSummary(threadId, messageId, summary, user.userId);
+      }
     } catch (error) {
       console.error("Failed to save user message:", error);
     }
@@ -250,8 +264,7 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       switch (modelConfig.provider) {
         case 'google':
           // For Google, we need to ensure we're using the correct model ID format
-          const geminiModelId = modelConfig.modelId;
-          responseText = await callGeminiAPI(updatedMessages, apiKey, geminiModelId);
+          responseText = await callGeminiAPI(updatedMessages, apiKey, modelConfig.modelId);
           break;
         case 'openai':
           responseText = await callOpenAIAPI(updatedMessages, apiKey, modelConfig.modelId);
@@ -276,7 +289,17 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       setMessages([...updatedMessages, aiMsg]);
       
       // Save AI message to database
-      await createMessage(threadId, aiMsg, user?.userId || '');
+      const aiMessageId = await createMessage(threadId, aiMsg, user?.userId || '');
+      
+      // Create a summary for the AI message
+      if (aiMessageId && user) {
+        // Create a direct summary from the message content
+        const summary = createSummaryFromMessage(responseText);
+        await createMessageSummary(threadId, aiMessageId, summary, user.userId);
+      }
+      
+      // Use a single timeout for scrolling
+      setTimeout(scrollToBottom, 100);
       
     } catch (error) {
       console.error("API Error:", error);
@@ -285,7 +308,7 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [apiKey, isGenerating, messages, threadId, user, createMessage, createMessageSummary, scrollToBottom, setMessages, modelConfig]);
 
   // Update document title based on first message
   useEffect(() => {
@@ -301,19 +324,74 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
         : firstUserMessage;
       
       // Update document title
-      document.title = `${newTitle} - Chat0`;
+      document.title = `${newTitle} - lax`;
       
       // Update thread title in database if this is the first user message
       if (userMessages.length === 1 && user) {
-        updateThread(threadId, newTitle).catch(err => {
+        updateThread(threadId, { title: newTitle }).catch((err: any) => {
           console.error('Failed to update thread title:', err);
         });
       }
     } else {
       // Default title when no messages
-      document.title = 'New Chat - Chat0';
+      document.title = 'New Chat - lax';
     }
   }, [messages, threadId, updateThread, user]);
+
+  // Clean up duplicate summaries and create missing summaries when component mounts
+  useEffect(() => {
+    // Only run this once when the component mounts
+    if (hasInitialized.current) return;
+    
+    const initializeNavigator = async () => {
+      if (!user || !threadId || !allMessages) return;
+      
+      try {
+        hasInitialized.current = true;
+        
+        // First clean up any duplicate summaries
+        await cleanupDuplicates(threadId);
+        
+        // Wait for the cleanup to complete and get updated summaries
+        const updatedSummaries = allSummaries;
+        if (!updatedSummaries) return;
+        
+        // Create a set of message IDs that already have summaries
+        const messagesWithSummaries = new Set(updatedSummaries.map((summary: any) => summary.messageId));
+        
+        // Find messages without summaries
+        const messagesWithoutSummaries = allMessages.filter((message: any) => 
+          !messagesWithSummaries.has(message._id)
+        );
+        
+        // Limit the number of summaries we create at once to avoid overloading
+        const MAX_SUMMARIES_TO_CREATE = 5;
+        const limitedMessages = messagesWithoutSummaries.slice(0, MAX_SUMMARIES_TO_CREATE);
+        
+        // Create summaries for messages that don't have them
+        for (const message of limitedMessages) {
+          if (!message || !message.content) continue;
+          
+          const summary = createSummaryFromMessage(message.content);
+          try {
+            await createMessageSummary(threadId, message._id, summary, user.userId);
+          } catch (error) {
+            console.error(`Failed to create summary for message:`, error);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize navigator:", error);
+      }
+    };
+    
+    // Wrap in setTimeout to avoid immediate execution during render
+    const timer = setTimeout(() => {
+      initializeNavigator();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId, user, allMessages?.length]); // Simplified dependencies to avoid excessive re-renders
 
   if (!user) return null;
 
@@ -344,56 +422,68 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
 
   // Map our isGenerating state to valid status values expected by components
   const chatStatus = isGenerating ? 'streaming' : 'ready';
+  
+  // Determine button position based on sidebar position
+  const navigatorButtonPosition = useMemo(() => 
+    position === 'right' ? 'left-16' : 'right-16'
+  , [position]);
 
   return (
-    <div className="relative w-full">
-      <SidebarTrigger />
-      <main
-        className={`flex flex-col w-full max-w-3xl pt-10 pb-44 mx-auto transition-all duration-300 ease-in-out`}
-      >
-        {errorMessage && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
-            <div className="flex">
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  Error: {errorMessage}
-                </p>
+    <div className="relative w-full h-full flex flex-col">
+      <div className="flex-1 overflow-auto pb-48" id="chat-scroll-container">
+        <div className="flex flex-col items-center">
+          <main
+            className={`flex flex-col w-full max-w-3xl pt-10 mx-auto transition-all duration-300 ease-in-out`}
+          >
+            {errorMessage && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">
+                      Error: {errorMessage}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-        
-        <Messages
-          threadId={threadId}
-          messages={messages}
-          status={chatStatus}
-          setMessages={setMessages}
-          reload={reload}
-          error={error}
-          registerRef={registerRef}
-          stop={() => setIsGenerating(false)}
-        />
-        
-        <ChatInput
-          threadId={threadId}
-          input={input}
-          status={chatStatus}
-          append={(message) => {
-            handleSubmit(message.content);
-            return Promise.resolve(message.id);
-          }}
-          setInput={setInput}
-          stop={() => setIsGenerating(false)}
-          userId={user.userId}
-        />
-      </main>
+            )}
+            
+            <Messages
+              threadId={threadId}
+              messages={messages}
+              status={chatStatus}
+              setMessages={setMessages}
+              reload={reload}
+              error={error}
+              registerRef={registerRef}
+              stop={() => setIsGenerating(false)}
+            />
+            
+            {/* Invisible div at the end to scroll to */}
+            <div ref={messagesEndRef} className="h-1" id="messages-end" />
+          </main>
+        </div>
+      </div>
+      
+      <ChatInput
+        key={`chat-input-${threadId}`}
+        threadId={threadId}
+        input={input}
+        status={chatStatus}
+        append={(message) => {
+          handleSubmit(message.content);
+          return Promise.resolve(message.id);
+        }}
+        setInput={setInput}
+        stop={() => setIsGenerating(false)}
+        userId={user.userId}
+      />
       
       <ThemeToggler />
       <Button
         onClick={handleToggleNavigator}
         variant="outline"
         size="icon"
-        className="fixed right-16 top-4 z-20"
+        className={`fixed ${navigatorButtonPosition} top-4 z-50`}
         aria-label={
           isNavigatorVisible
             ? 'Hide message navigator'
@@ -411,4 +501,6 @@ export default function Chat({ threadId, initialMessages }: ChatProps) {
       />
     </div>
   );
-}
+});
+
+export default Chat;

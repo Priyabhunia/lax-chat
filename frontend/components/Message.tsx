@@ -1,11 +1,10 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import MarkdownRenderer from '@/frontend/components/MemoizedMarkdown';
 import { cn } from '@/lib/utils';
 import { UIMessage } from 'ai';
 import equal from 'fast-deep-equal';
 import MessageControls from './MessageControls';
 import { UseChatHelpers } from '@ai-sdk/react';
-import MessageEditor from './MessageEditor';
 import MessageReasoning from './MessageReasoning';
 
 function PureMessage({
@@ -25,8 +24,6 @@ function PureMessage({
   registerRef: (id: string, ref: HTMLDivElement | null) => void;
   stop: UseChatHelpers['stop'];
 }) {
-  const [mode, setMode] = useState<'view' | 'edit'>('view');
-
   return (
     <div
       role="article"
@@ -56,33 +53,23 @@ function PureMessage({
               className="relative group px-4 py-3 rounded-xl bg-secondary border border-secondary-foreground/2 max-w-[80%]"
               ref={(el) => registerRef(message.id, el)}
             >
-              {mode === 'edit' && (
-                <MessageEditor
-                  threadId={threadId}
-                  message={message}
-                  content={part.text}
-                  setMessages={setMessages}
-                  reload={reload}
-                  setMode={setMode}
-                  stop={stop}
-                />
-              )}
-              {mode === 'view' && <p>{part.text}</p>}
+              <p>{part.text}</p>
 
-              {mode === 'view' && (
-                <MessageControls
-                  threadId={threadId}
-                  content={part.text}
-                  message={message}
-                  setMode={setMode}
-                  setMessages={setMessages}
-                  reload={reload}
-                  stop={stop}
-                />
-              )}
+              <MessageControls
+                threadId={threadId}
+                content={part.text}
+                message={message}
+                setMessages={setMessages}
+                reload={reload}
+                stop={stop}
+              />
             </div>
           ) : (
-            <div key={key} className="group flex flex-col gap-2 w-full">
+            <div 
+              key={key} 
+              className="group flex flex-col gap-2 w-full"
+              ref={(el) => registerRef(message.id, el)}
+            >
               <MarkdownRenderer content={part.text} id={message.id} />
               {!isStreaming && (
                 <MessageControls

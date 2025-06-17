@@ -1,6 +1,6 @@
-# Detailed Setup Guide for Chat0
+# Detailed Setup Guide for lax
 
-This guide provides comprehensive instructions for setting up Chat0 with its Convex backend.
+This guide provides comprehensive instructions for setting up lax with its Convex backend.
 
 ## Prerequisites
 
@@ -12,8 +12,8 @@ This guide provides comprehensive instructions for setting up Chat0 with its Con
 ## Step 1: Clone and Install
 
 ```bash
-git clone https://github.com/senbo1/chat0.git
-cd chat0
+git clone https://github.com/Priyabhunia/me.git
+cd lax
 pnpm install
 ```
 
@@ -28,7 +28,7 @@ pnpm install
 ### Initialize Convex in Your Project
 
 ```bash
-npx convex init
+npx convex dev
 ```
 
 Follow the prompts to:
@@ -106,3 +106,7 @@ For production:
 1. Deploy your frontend to your preferred hosting (Vercel, Netlify, etc.)
 2. Set the environment variable `NEXT_PUBLIC_CONVEX_URL` to your production Convex URL
 3. Ensure your Convex project is on an appropriate tier for your expected usage
+
+## Repository
+
+https://github.com/Priyabhunia/me
